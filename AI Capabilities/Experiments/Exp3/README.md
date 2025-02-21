@@ -32,17 +32,17 @@ The goal of this project is to fine-tune a Vision Transformer (ViT) model for Sk
 The dataset used for this project consists of images organized into **9 categories**. Each category represents a specific label, and the images are stored in separate folders within the root directory. The dataset is split into training and validation sets with an **80/20 split**.
 
 ### Dataset Structure
-
+```
 sknAI_Dataset/
 ├── skin_cancer/
-│ ├── image1.jpg
-│ ├── image2.jpg
-│ └── ...
+│   ├── image1.jpg
+│   ├── image2.jpg
+│   └── ...
 ├── acne/
-│ ├── image1.jpg
-│ └── ...
+│   ├── image1.jpg
+│   └── ...
 └── ...
-
+```
 ### Classes
 ["Acne", "Allergy", "Alopecia", "Eczema", "Fungal Infection", "Hyper Pigmentation", "Psoriasis", "Skin Cancer", "Vitiligo"]
 
