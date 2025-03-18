@@ -9,11 +9,12 @@ import pinecone
 import os
 import torch
 from transformers import AutoModel, AutoTokenizer
-from typing import List
 from functools import lru_cache
 import logging
+import uuid
 import numpy as np
 from dotenv import load_dotenv
+from typing import List, Dict, Optional
 # Load environment variables from .env file
 load_dotenv()
 
@@ -21,13 +22,23 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+# Dictionary to store conversation history - Temperory measure, will be replaced by a database
+conversation_store: Dict[str, List[Dict[str,str]]] = {}
+
+
 # Initialize FastAPI app
 app = FastAPI(title="SknAI Chatbot API")
 
-# Pydantic models for request/response
-class QuestionRequest(BaseModel):
-    query: str = Field(..., min_length=3, max_length=1000, description="The question to ask the AI")
+# Define request models
+class FirstQuestionRequest(BaseModel):
+    predicted_disease: str  # Only the disease name, no user query
 
+class FollowUpQuestionRequest(BaseModel):
+    session_id: str
+    query: str = Field(..., min_length=3, max_length=1000)
+
+# Define response models
 class SourceInfo(BaseModel):
     source: str
     title: str = ""
@@ -35,6 +46,22 @@ class SourceInfo(BaseModel):
 class QuestionResponse(BaseModel):
     response: str
     sources: List[SourceInfo]
+    session_id: str
+
+
+# Pydantic models for request/response
+class QuestionRequest(BaseModel):
+    query: str = Field(..., min_length=3, max_length=1000, description="The question to ask the AI")
+
+
+# Function to get conversation history
+def get_conversation_history(session_id: str) -> str:
+    """Retrieve formatted conversation history for LLM input."""
+    history = conversation_store.get(session_id, [])
+    formatted_history = "\n\n".join(
+        f"User: {entry['query']}\nAI: {entry['response']}" for entry in history
+    )
+    return formatted_history
 
 # Load environment variables safely
 def get_env_variable(name: str) -> str:
@@ -171,41 +198,122 @@ def init_services():
 async def root():
     return {"message": "Welcome to the SknAI chatbot API!", "status": "healthy"}
 
-@app.post("/ask", response_model=QuestionResponse)
-async def ask_question(request: QuestionRequest):
+@app.post("/ask/first", response_model=QuestionResponse)
+async def ask_first_question(request: FirstQuestionRequest):
+    """Handles the first request, generating a summary based on predicted disease."""
     try:
-        # Log the incoming query
-        logger.info(f"Received question: {request.query}")
+        session_id = str(uuid.uuid4())  # Generate new session ID
+        logger.info(f"New session {session_id}: Predicted Disease: {request.predicted_disease}")
+
+        # Retrieve context from Pinecone
+        disease_context = retriever.get_relevant_documents(request.predicted_disease)
+        formatted_context = "\n\n".join(doc.page_content for doc in disease_context)
+
+        # Prepare system prompt
         
-        # Check if services are initialized
-        if qa_chain is None:
-            logger.warning("Services not initialized, attempting to initialize now")
-            init_services()
-            
-        # Process the query to get the response
-        response_text = qa_chain.invoke(request.query)
-        
-        # Retrieve documents separately for source information
-        docs = retriever.get_relevant_documents(request.query)
-        
-        # Format the sources
-        sources = []
-        for doc in docs:
-            source_info = SourceInfo(
-                source=doc.metadata.get("source", "Unknown"),
-                title=doc.metadata.get("title", "")
-            )
-            sources.append(source_info)
-        
-        # Return the structured response
-        return QuestionResponse(
-            response=response_text,
-            sources=sources
-        )
+        system_prompt = f"""
+You are a virtual doctor providing guidance to a patient. Based on the predicted disease "{request.predicted_disease}",  
+explain the condition in a clear and professional manner, just as a doctor would during a consultation.  
+Ensure the response is **informative, empathetic, and reassuring**, while still being easy to understand.  
+
+Cover the following details:  
+- **What it is** – Briefly describe the condition.  
+- **Common symptoms** – Mention the usual signs patients experience.  
+- **Causes** – Explain why this condition may occur.  
+- **Treatments** – Outline general treatment options, including medications, lifestyle changes, and when to seek professional care.  
+
+Use a **calm, professional, and reassuring tone**, making the patient feel supported.  
+However, at the end of your response, **clearly state that you are an AI and not a real doctor**, advising the patient to consult a healthcare professional for a proper diagnosis and treatment.  
+
+---
+
+**Disclaimer:** "I am an AI medical assistant, not a licensed doctor. While I strive to provide accurate and helpful information, please consult a qualified healthcare professional for a proper diagnosis and treatment plan."
+"""
+
+        # Generate response
+        response_text = qa_chain.invoke(system_prompt)
+
+        # Store conversation history
+        conversation_store[session_id] = [{"query": f"Info on {request.predicted_disease}", "response": response_text}]
+
+        # Extract sources
+        sources = [SourceInfo(source=doc.metadata.get("source", "Unknown"), title=doc.metadata.get("title", "")) for doc in disease_context]
+
+        return QuestionResponse(response=response_text, sources=sources, session_id=session_id)
 
     except Exception as e:
-        logger.error(f"Error processing request: {str(e)}")
+        logger.error(f"Error processing first request: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing your request: {str(e)}")
+
+
+@app.post("/ask/followup", response_model=QuestionResponse)
+async def ask_followup_question(request: FollowUpQuestionRequest):
+    """Handles follow-up user questions with stored session context."""
+    try:
+        session_id = request.session_id
+        if session_id not in conversation_store:
+            raise HTTPException(status_code=400, detail="Invalid session_id or session expired.")
+
+        logger.info(f"Session {session_id}: Follow-up question: {request.query}")
+
+        # Retrieve previous chat history
+        previous_context = get_conversation_history(session_id)
+
+        # Construct new query with history
+        full_query = f"Previous conversation:\n{previous_context}\n\nNew Question: {request.query}"
+
+        # Generate response
+        response_text = qa_chain.invoke(full_query)
+
+        # Retrieve source documents
+        docs = retriever.get_relevant_documents(request.query)
+        sources = [SourceInfo(source=doc.metadata.get("source", "Unknown"), title=doc.metadata.get("title", "")) for doc in docs]
+
+        # Store query & response in session history
+        conversation_store[session_id].append({"query": request.query, "response": response_text})
+
+        return QuestionResponse(response=response_text, sources=sources, session_id=session_id)
+
+    except Exception as e:
+        logger.error(f"Error processing follow-up question: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing your request: {str(e)}")
+
+
+# @app.post("/ask", response_model=QuestionResponse)
+# async def ask_question(request: QuestionRequest):
+#     try:
+#         # Log the incoming query
+#         logger.info(f"Received question: {request.query}")
+        
+#         # Check if services are initialized
+#         if qa_chain is None:
+#             logger.warning("Services not initialized, attempting to initialize now")
+#             init_services()
+            
+#         # Process the query to get the response
+#         response_text = qa_chain.invoke(request.query)
+        
+#         # Retrieve documents separately for source information
+#         docs = retriever.get_relevant_documents(request.query)
+        
+#         # Format the sources
+#         sources = []
+#         for doc in docs:
+#             source_info = SourceInfo(
+#                 source=doc.metadata.get("source", "Unknown"),
+#                 title=doc.metadata.get("title", "")
+#             )
+#             sources.append(source_info)
+        
+#         # Return the structured response
+#         return QuestionResponse(
+#             response=response_text,
+#             sources=sources
+#         )
+
+#     except Exception as e:
+#         logger.error(f"Error processing request: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Error processing your request: {str(e)}")
 
 # Health check endpoint
 @app.get("/health")
