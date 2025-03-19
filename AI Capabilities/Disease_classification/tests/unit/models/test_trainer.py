@@ -1,3 +1,7 @@
+"""
+Unit tests for model training utilities: metrics computation and optimizer setup.
+"""
+
 import numpy as np
 from types import SimpleNamespace
 from transformers import TrainingArguments
@@ -5,7 +9,7 @@ from torch import nn
 import sys
 import os
 
-# Ensure the root project directory is in the path
+# Fix path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, ".."))
 sys.path.insert(0, project_root)
@@ -13,6 +17,7 @@ sys.path.insert(0, project_root)
 from src.models.trainer import compute_metrics, custom_optimizer
 
 def test_compute_metrics():
+    """Test accuracy computation on dummy logits and labels."""
     preds = SimpleNamespace(
         predictions=np.array([[0.2, 0.8], [0.9, 0.1]]),
         label_ids=np.array([1, 0])
@@ -22,6 +27,7 @@ def test_compute_metrics():
     assert result["accuracy"] == 1.0
 
 def test_custom_optimizer():
+    """Ensure custom optimizer and scheduler are correctly instantiated."""
     model = nn.Linear(10, 2)
     training_args = TrainingArguments(
         output_dir="./test_output",
