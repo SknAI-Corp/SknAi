@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+
+langchain
+langchain-core
+langchain-mistralai
+
+transformers
+torch
+
+pdfplumber
+pinecone-client
+
+tqdm
+python-dotenv
