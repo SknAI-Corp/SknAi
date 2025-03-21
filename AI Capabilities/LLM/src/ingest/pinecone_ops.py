@@ -2,6 +2,9 @@
 from src.embeddings.embedder import embed_text
 import os
 from pinecone import Pinecone, ServerlessSpec
+# Load .env file
+from dotenv import load_dotenv
+load_dotenv()
 
 def initialize_pinecone(index_name="sknai", dimension=1536, metric="cosine"):
     pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))

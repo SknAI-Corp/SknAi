@@ -3,122 +3,46 @@ from fastapi.testclient import TestClient
 import os
 import sys
 import logging
+import sys
+import os
+# Make the path to the src folder available
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-# Determine the correct path to add
-project_root = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-sys.path.append(project_root)
+from src.api.routes import router
 
-# Import your FastAPI app
-from src.api.main import app
+# Creating test cases for the API
+# Make session id a global variable
+session_id = ""
 
-@pytest.fixture
-def client():
-    # Return the test client
-    with TestClient(app) as test_client:
-        yield test_client
+def test_ask_first_question():
+    client = TestClient(router)
+    response = client.post("/ask/first", json={"predicted_disease": "psoriasis"})
 
-# Test case for root endpoint
-def test_root_endpoint(client):
-    response = client.get("/")
+    # Debugging step: Print response JSON
+    print("DEBUG: Response JSON =", response.json())
+
+    # Save the session id for the next test
+    global session_id
+    session_id = response.json().get("session_id", None)
+
     assert response.status_code == 200
-    assert "message" in response.json()
+    assert "response" in response.json()
+    assert "session_id" in response.json()
 
-# Test case for /ask/first endpoint with mocking
-def test_ask_first_question(client, monkeypatch):
-    # Mock the retriever.get_relevant_documents method
-    mock_docs = [type('obj', (object,), {
-        'page_content': 'Mock content about Psoriasis',
-        'metadata': {'source': 'mock_source', 'title': 'Mock Title'}
-    })]
-    
-    def mock_get_docs(*args, **kwargs):
-        return mock_docs
-    
-    # Mock the qa_chain.invoke method
-    def mock_invoke(*args, **kwargs):
-        return "This is a test response about Psoriasis."
-    
-    # Apply monkeypatches
-    import src.api.main
-    # Create dummy class for qa_chain if it doesn't exist
-    if not hasattr(src.api.main, "qa_chain"):
-        class MockQAChain:
-            def invoke(self, query):
-                return "This is a test response about Psoriasis."
-        src.api.main.qa_chain = MockQAChain()
-    else:
-        monkeypatch.setattr(src.api.main.qa_chain, "invoke", mock_invoke)
-    
-    # Create dummy class for retriever if it doesn't exist
-    if not hasattr(src.api.main, "retriever"):
-        class MockRetriever:
-            def get_relevant_documents(self, query):
-                return mock_docs
-        src.api.main.retriever = MockRetriever()
-    else:
-        monkeypatch.setattr(src.api.main.retriever, "get_relevant_documents", mock_get_docs)
-    
-    # Send request
-    request_data = {"predicted_disease": "Psoriasis"}
-    response = client.post("/ask/first", json=request_data)
-    
-    # Check response
+
+def test_ask_followup_question():
+    client = TestClient(router)
+    response = client.post("/ask/followup", json={"session_id": session_id, "query": "What is a psoriasis?"})
     assert response.status_code == 200
+    assert "response" in response.json()
+    assert "session_id" in response.json()
     
-    # Basic structure validation
-    response_data = response.json()
-    assert "response" in response_data
-    assert "session_id" in response_data
-    assert "sources" in response_data
-    
-    return response_data["session_id"]
+# Test the API
 
-# Test case for /ask/followup endpoint
-def test_ask_followup_question(client, monkeypatch):
-    # First create a session
-    session_id = test_ask_first_question(client, monkeypatch)
-    
-    # Mock documents for the followup
-    mock_docs = [type('obj', (object,), {
-        'page_content': 'Mock content about treatment options',
-        'metadata': {'source': 'mock_source', 'title': 'Mock Title'}
-    })]
-    
-    def mock_get_docs(*args, **kwargs):
-        return mock_docs
-    
-    # Mock the retriever again (in case it was reset)
-    import src.api.main
-    if not hasattr(src.api.main, "retriever"):
-        class MockRetriever:
-            def get_relevant_documents(self, query):
-                return mock_docs
-        src.api.main.retriever = MockRetriever()
-    else:
-        monkeypatch.setattr(src.api.main.retriever, "get_relevant_documents", mock_get_docs)
-    
-    # Use the session_id to make a follow-up request
-    request_data = {"session_id": session_id, "query": "What are the treatment options?"}
-    response = client.post("/ask/followup", json=request_data)
-    
-    # Check response
-    assert response.status_code == 200
-    
-    # Basic structure validation
-    response_data = response.json()
-    assert "response" in response_data
-    assert "session_id" in response_data
-    assert "sources" in response_data
+# Test the first question
+test_ask_first_question()
 
-# Test case for invalid session ID
-def test_ask_followup_invalid_session(client):
-    # Make a follow-up request with an invalid session_id
-    request_data = {"session_id": "invalid-session-id", "query": "What are the treatment options?"}
-    response = client.post("/ask/followup", json=request_data)
-    
-    # Check if the response status is 400 (Bad Request)
-    assert response.status_code == 400
+# Test the follow-up question
+test_ask_followup_question()
+

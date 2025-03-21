@@ -1,3 +1,9 @@
+import sys
+import os
+
+# Add the parent directory (LLM) to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Dict
@@ -60,6 +66,9 @@ Disclaimer: "I am an AI medical assistant, not a licensed doctor. Please consult
 """
 
     response_text = qa_chain.invoke(system_prompt)
+    # Response text is a dict with keys "query" and "result"
+    # We only need the "result" key
+    response_text = response_text["result"]
     conversation_store[session_id] = [{"query": f"Info on {request.predicted_disease}", "response": response_text}]
     sources = [SourceInfo(source=doc.metadata.get("source", "Unknown"), title=doc.metadata.get("title", "")) for doc in disease_context]
 
@@ -74,7 +83,7 @@ async def ask_followup_question(request: FollowUpQuestionRequest):
     previous_context = get_conversation_history(session_id, conversation_store)
     full_query = f"Previous conversation:\n{previous_context}\n\nNew Question: {request.query}"
     response_text = qa_chain.invoke(full_query)
-
+    response_text = response_text["result"]
     docs = retriever.get_relevant_documents(request.query)
     sources = [SourceInfo(source=doc.metadata.get("source", "Unknown"), title=doc.metadata.get("title", "")) for doc in docs]
 
