@@ -116,6 +116,10 @@ python pipelines/test_pipeline.py
 
 ### Conversational AI
 Unit testing support coming soon for embedding and API endpoints.
+```bash
+cd LLM
+python test/test_pipeline.py
+```
 
 ---
 
