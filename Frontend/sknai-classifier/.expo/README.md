@@ -1,8 +1,60 @@
-> Why do I have a folder named ".expo" in my project?
-The ".expo" folder is created when an Expo project is started using "expo start" command.
-> What do the files contain?
-- "devices.json": contains information about devices that have recently opened this project. This is used to populate the "Development sessions" list in your development builds.
-- "settings.json": contains the server configuration that is used to serve the application manifest.
-> Should I commit the ".expo" folder?
-No, you should not share the ".expo" folder. It does not contain any information that is relevant for other developers working on the project, it is specific to your machine.
-Upon project creation, the ".expo" folder is already added to your ".gitignore" file.
+# SKNAI - React Native App
+
+## Overview
+**SKNAI** is a React Native mobile application built using **Expo CLI**. This app leverages React Native's capabilities to provide a seamless user experience across iOS and Android devices.
+
+## Features
+- Cross-platform compatibility (iOS & Android)
+- Built using Expo for easy development & deployment
+- Intuitive UI/UX with React Native components
+- State management with Context API
+- API integration
+- Authentication 
+
+## Installation
+To set up and run the project locally, follow these steps:
+
+### Prerequisites
+- Install [Node.js](https://nodejs.org/)
+- Install [Expo CLI](https://docs.expo.dev/get-started/installation/):
+  ```sh
+  npm install -g expo-cli
+  ```
+
+### Install Dependencies
+```sh
+npm install
+```
+
+### Run the App
+```sh
+expo start
+```
+This will start the development server. You can then scan the QR code using the Expo Go app on your device or run it on an emulator.
+
+## Project Structure
+```
+/sknai/Frontend/sknai-classifier/
+│── /assets          # Static assets like images
+│── /components      # Reusable UI components
+│── /screens         # App screens
+│── /hooks      # Navigation setup
+│── App.js           # Main entry file
+│── package.json     # Project metadata & dependencies
+│── app.json         # Expo configuration
+```
+
+## Deployment
+To build the app for production:
+```sh
+expo build:android  # For Android APK/AAB
+expo build:ios      # For iOS (requires Apple Developer Account)
+```
+To publish the app:
+```sh
+expo publish
+```
+
+## License
+This project is licensed under the [MIT License](LICENSE).
+
