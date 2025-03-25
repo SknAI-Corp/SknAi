@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "sknai",
+    "slug": "sknai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+   
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.chutpaglu.sknai",
+      "googleServicesFile": "../GoogleService-Info.plist"
+    },
+    "android": {
+      "adaptiveIcon": {
+        
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.chutpaglu.sknai"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+      
+    },
+    "plugins": [
+      "expo-router",
+      
+      [
+        "expo-splash-screen",
+        {
+          
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
