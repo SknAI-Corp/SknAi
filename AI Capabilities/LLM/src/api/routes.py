@@ -22,7 +22,7 @@ PREDICT_API_URL = "http://localhost:8080/predict_mongo"  # URL of your predict_m
 from services.fetch_image_from_mongo import fetch_image_from_mongo
 logger = logging.getLogger(__name__)
 router = APIRouter()
-SLIDING_WINDOW_SIZE = 5
+SLIDING_WINDOW_SIZE = 10
 import httpx
 
 from fastapi.responses import JSONResponse

@@ -105,6 +105,12 @@ AI Response: Eczema is a common...
 
 ## 🌐 API Usage
 
+Note:
+
+-> Before you run this server, go to disease classification and start the server of disease classification as it
+depends on that api as well.
+-> Follow the instruction in Disease Classification Readme to start the server there.
+
 ### ▶️ Run the Server
 ```bash
 uvicorn src.api.main:app --reload

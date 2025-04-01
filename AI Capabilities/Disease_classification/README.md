@@ -50,6 +50,9 @@ Then visit: [http://localhost:8080/docs](http://localhost:8080/docs)
 ---
 
 ## ✅ Running the API (Without Docker)
+
+-> Run this api before you run the LLM API
+
 ```bash
 python pipelines/deploy_pipeline.py
 ```
