@@ -1,92 +1,141 @@
 import sys
 import os
-
 # Add the parent directory (LLM) to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from typing import List, Dict
 import uuid
 import logging
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+import io
+from typing import List, Dict, Optional
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+from PIL import Image
 from src.chat.chain import setup_qa_chain
-from src.services.context import get_conversation_history
 from src.ingest.pinecone_ops import initialize_pinecone
 from src.embeddings.model_loader import load_biobert_model
 from src.embeddings.embedder import embed_text
 from langchain.vectorstores import Pinecone
-
+PREDICT_API_URL = "http://localhost:8080/predict_mongo"  # URL of your predict_mongo route
+from services.fetch_image_from_mongo import fetch_image_from_mongo
 logger = logging.getLogger(__name__)
 router = APIRouter()
+SLIDING_WINDOW_SIZE = 5
+import httpx
 
+from fastapi.responses import JSONResponse
+import json
 conversation_store: Dict[str, List[Dict[str, str]]] = {}
 
-class FirstQuestionRequest(BaseModel):
-    predicted_disease: str
-
-class FollowUpQuestionRequest(BaseModel):
-    session_id: str
-    query: str = Field(..., min_length=3, max_length=1000)
+class ChatRequest(BaseModel):
+    session_id: Optional[str] = None
+    user_message: Optional[str] = None
+    image_id: Optional[str] = None
 
 class SourceInfo(BaseModel):
     source: str
     title: str = ""
 
-class QuestionResponse(BaseModel):
+class ChatResponse(BaseModel):
     response: str
-    sources: List[SourceInfo]
     session_id: str
+    classification: Optional[Dict[str, float]] = None
 
 index = initialize_pinecone()
 tokenizer, model = load_biobert_model()
 vector_store = Pinecone(index=index, embedding=embed_text, text_key="text")
 qa_chain = setup_qa_chain(vector_store)
-retriever = vector_store.as_retriever(search_kwargs={"k": 3})
+retriever = vector_store.as_retriever(search_kwargs={"k": 15})
 
-@router.post("/ask/first", response_model=QuestionResponse)
-async def ask_first_question(request: FirstQuestionRequest):
-    session_id = str(uuid.uuid4())
-    logger.info(f"New session {session_id}: Predicted Disease: {request.predicted_disease}")
+def get_conversation_history(session_id: str) -> str:
+    history = conversation_store.get(session_id, [])
+    return "\n".join(f"User: {entry['query']}\nAI: {entry['response']}" for entry in history[-SLIDING_WINDOW_SIZE:])
 
-    disease_context = retriever.get_relevant_documents(request.predicted_disease)
-    formatted_context = "\n\n".join(doc.page_content for doc in disease_context)
+async def generate_response(full_prompt, session_id):
+    """Async generator to stream AI responses with session_id."""
+    response_text = ""
+    async for chunk in qa_chain.astream(full_prompt):
+        # print(chunk)  # or use logging
 
-    system_prompt = f"""You are a virtual doctor providing guidance to a patient. Based on the predicted disease "{request.predicted_disease}",  
-explain the condition in a clear and professional manner...
+        # chunk is a string, so append it directly to response_text
+        response_text += chunk.get('result', '')
 
-Cover the following details:  
-- What it is  
-- Common symptoms  
-- Causes  
-- Treatments  
+        # Yield the current response text as a JSON object for streaming
+        yield {"response": response_text, "session_id": session_id}
 
-At the end of your response, clearly state that you are an AI and not a real doctor, advising the patient to consult a healthcare professional.
 
-Disclaimer: "I am an AI medical assistant, not a licensed doctor. Please consult a qualified healthcare professional for diagnosis and treatment."
-"""
+        
+        
+@router.post("/chat", response_model=ChatResponse)
+async def chat_with_ai(request: ChatRequest):
+    session_id = request.session_id or str(uuid.uuid4())
+    user_message = request.user_message
+    image_id = request.image_id if hasattr(request, "image_id") else None  # Optional handling if needed
+    full_prompt = ""
+    if not session_id:
+        session_id = str(uuid.uuid4())
 
-    response_text = qa_chain.invoke(system_prompt)
-    # Response text is a dict with keys "query" and "result"
-    # We only need the "result" key
-    response_text = response_text["result"]
-    conversation_store[session_id] = [{"query": f"Info on {request.predicted_disease}", "response": response_text}]
-    sources = [SourceInfo(source=doc.metadata.get("source", "Unknown"), title=doc.metadata.get("title", "")) for doc in disease_context]
+    classification_result = None
+    formatted_context = ""
+    
+    # Fetch classification results if an image ID is provided
+    if image_id:
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(PREDICT_API_URL, json={"image_id": image_id})
+            
+                # Log the raw response content
+                logger.info(f"API response received: {response.text}")
+                
+                # Parse the JSON response
+                classification_result = response.json()
+                
+                if classification_result:
+                    logger.info(f"Classification Result: {classification_result}")
+                else:
+                    logger.error(f"No valid classification result returned for image_id {image_id}")
+                    
+            except httpx.HTTPError as e:
+                logger.error(f"Error calling predict_mongo API: {e}")
+                raise HTTPException(status_code=500, detail="Error calling disease classification API")
 
-    return QuestionResponse(response=response_text, sources=sources, session_id=session_id)
 
-@router.post("/ask/followup", response_model=QuestionResponse)
-async def ask_followup_question(request: FollowUpQuestionRequest):
-    session_id = request.session_id
-    if session_id not in conversation_store:
-        raise HTTPException(status_code=400, detail="Invalid session_id or session expired.")
+    # Check if the API response is in the expected format
+    if classification_result and "prediction" in classification_result and "confidence" in classification_result:
+        predicted_disease = classification_result["prediction"]
+        confidence = classification_result["confidence"]
+        
+        # Log the disease and confidence
+        logger.info(f"Predicted Disease: {predicted_disease}, Confidence: {confidence}")
+        
+        # Retrieve most likely disease and fetch relevant docs
+        disease_context = retriever.get_relevant_documents(predicted_disease)
+        formatted_context = "\n\n".join(doc.page_content for doc in disease_context)
 
-    previous_context = get_conversation_history(session_id, conversation_store)
-    full_query = f"Previous conversation:\n{previous_context}\n\nNew Question: {request.query}"
-    response_text = qa_chain.invoke(full_query)
-    response_text = response_text["result"]
-    docs = retriever.get_relevant_documents(request.query)
-    sources = [SourceInfo(source=doc.metadata.get("source", "Unknown"), title=doc.metadata.get("title", "")) for doc in docs]
+        # Build your prompt
+        full_prompt = f"""You are an AI skin specialist. Based on the uploaded image, the most probable disease is **{predicted_disease}** with a confidence of **{confidence}**.
+        Here is some important medical information about this condition:\n\n{formatted_context}\n\n"""
 
-    conversation_store[session_id].append({"query": request.query, "response": response_text})
+    else:
+        logger.error(f"Unexpected classification result format: {classification_result}")
 
-    return QuestionResponse(response=response_text, sources=sources, session_id=session_id)
+
+    previous_context = get_conversation_history(session_id)
+    full_prompt+=previous_context
+    
+    # 🔹 Append user query
+    if user_message:
+        full_prompt += f"User: {user_message}\n"
+
+# Here we consume the async generator properly
+    response_text = ""
+    async for chunk in generate_response(full_prompt, session_id):  # Use async for to handle the generator
+        response_text += chunk["response"]  # Access the response from the chunk dictionary
+
+
+    return JSONResponse(content={
+    "response": response_text,
+    "session_id": session_id
+})
