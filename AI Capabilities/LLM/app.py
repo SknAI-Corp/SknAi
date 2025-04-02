@@ -44,23 +44,36 @@ async def chat_llm(request: ChatRequest):
     Handles disease-aware chat queries using LangChain + Mistral.
     """
     full_prompt = ""
+    retrieved_docs = []
 
-    # Append RAG context based on disease
+    # Retrieve context based on disease
     if request.disease_context:
-        docs = vector_store.similarity_search(
+        disease_docs = vector_store.similarity_search(
             query=request.disease_context,
-            k=RETRIEVAL_TOP_K
+            k=RETRIEVAL_TOP_K // 2  # Split retrieval budget
         )
-        formatted_context = "\n\n".join(doc.page_content for doc in docs)
-        full_prompt += (
-            f"You are an AI skin specialist. Based on the uploaded image, "
-            f"the most probable disease is **{request.disease_context}**.\n"
-            f"Here is some important medical information about this condition:\n\n"
-            f"{formatted_context}\n\n"
-        )
+        retrieved_docs.extend(disease_docs)
 
-    # Append user query
-    full_prompt += f"User: {request.query}"
+    # Retrieve context based on user query
+    query_docs = vector_store.similarity_search(
+        query=request.query,
+        k=RETRIEVAL_TOP_K // 2
+    )
+    retrieved_docs.extend(query_docs)
+
+    # Deduplicate results based on content (if needed)
+    unique_docs = list({doc.page_content: doc for doc in retrieved_docs}.values())
+
+    # Format retrieved context
+    formatted_context = "\n\n".join(doc.page_content for doc in unique_docs)
+    print(formatted_context)
+    # Construct full prompt
+    full_prompt = (
+        f"Here is some important medical information about this condition:\n\n"
+        f"{formatted_context}\n\n"
+        f"Answer questino for the disease the user is aksing about only\n"
+        f"User: {request.query}"
+    )
 
     try:
         result = qa_chain.run(full_prompt)

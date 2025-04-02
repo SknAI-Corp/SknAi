@@ -6,8 +6,7 @@ from config import LLM_MODEL_NAME, LLM_TEMPERATURE
 
 def setup_qa_chain(vector_store: Pinecone) -> RetrievalQA:
     llm = ChatMistralAI(
-        model=LLM_MODEL_NAME,
-        temperature=LLM_TEMPERATURE
+        model=LLM_MODEL_NAME
     )
 
     prompt = ChatPromptTemplate.from_messages([
