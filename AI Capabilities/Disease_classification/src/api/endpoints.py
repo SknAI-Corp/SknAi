@@ -1,47 +1,46 @@
-from fastapi import APIRouter, Body, File, Request, UploadFile, HTTPException, Form
+from fastapi import APIRouter, File, UploadFile, HTTPException, Form
 from PIL import Image
-import os
-from src.models.classifier import predict_disease
-from src.utils.config import UPLOAD_FOLDER
-from src.utils.mongo_utils import fetch_image_from_mongo
+from io import BytesIO
+from src.models.classifier import predict_disease_from_bytes
+
+
 router = APIRouter()
 
+from fastapi import APIRouter, HTTPException, Query
+from PIL import Image
+from io import BytesIO
+import requests
+from src.models.classifier import predict_disease_from_bytes
 
+router = APIRouter()
 
-@router.get("/")
-def home():
-    return {"message": "Welcome to the Skin Disease Classification API"}
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from PIL import Image
+from io import BytesIO
+import requests
+from src.models.classifier import predict_disease_from_bytes
 
-@router.post("/upload")
-def upload_file(file: UploadFile = File(...)):
-    try:
-        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-        with open(file_path, "wb") as f:
-            f.write(file.file.read())
-        return {"message": "File uploaded successfully", "file_name": file.filename}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+router = APIRouter()
+
+# 🔸 Request schema
+class ImageURLRequest(BaseModel):
+    image_url: str
 
 @router.post("/predict")
-def predict(file_name: str = Form(...)):
-    return predict_disease(file_name)
+def predict_from_url(request: ImageURLRequest):
+    try:
+        # Step 1: Download image from Cloudinary
+        response = requests.get(request.image_url)
+        if response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to fetch image from URL")
 
-# Note : Another endpoint will be added to directly fetch image from mongoDB and predict the disease on it.
+        image = Image.open(BytesIO(response.content)).convert("RGB")
 
-# @router.post("/predict_mongo")
-# async def predict_mongo(image_id: str = Body(...)):
-#     image = await fetch_image_from_mongo(image_id)
-#     return predict_disease(image)
+        # Step 2: Run prediction
+        result = predict_disease_from_bytes(image)
+        return result
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
-@router.post("/predict_mongo")
-async def predict_mongo(request: Request):
-    body = await request.json()  # Inspect incoming request
-    print(f"Received Request Body: {body}")
-    
-    if "image_id" not in body:
-        raise HTTPException(status_code=400, detail="Missing 'image_id' in request body")
-    
-    image_id = body["image_id"]
-    image = await fetch_image_from_mongo(image_id)
-    return predict_disease(image)

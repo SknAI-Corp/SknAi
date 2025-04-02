@@ -7,18 +7,18 @@ SknAI is a production-ready FastAPI application for classifying skin diseases us
 ## 📁 Folder Structure
 ```
 disease_classification/
-├── config/                 # id2label and preprocessor configs
-├── models/                 # Saved model files (e.g., model.safetensors)
-├── pipelines/              # Entry-point scripts for train/test/deploy/infer
-├── src/                    # Core application logic
-│   ├── api/                # FastAPI endpoints
-│   ├── models/             # Training + inference logic
-│   ├── utils/              # Preprocessing, config, dataset loader
-│   └── main.py             # FastAPI app
-├── tests/                  # Unit tests for all core modules
-├── Dockerfile              # Containerization
-├── requirements.txt        # Dependencies
-└── README.md               # Project documentation
+├── config/                 # Label mapping & preprocessing config
+├── models/                # Trained model & weights
+├── pipelines/            # Run training, inference, testing, deployment
+├── src/
+│   ├── api/               # FastAPI route for prediction
+│   ├── models/            # Training & prediction logic
+│   ├── utils/             # Preprocessing, config loading, dataset fetcher
+│   └── main.py            # FastAPI entry point
+├── tests/                 # Unit tests
+├── requirements.txt       # Dependencies
+├── Dockerfile             # Containerization
+└── README.md              # This file!
 ```
 
 ---
@@ -39,20 +39,7 @@ source env/bin/activate  # On Windows: env\Scripts\activate
 
 ---
 
-## 🐳 Run with Docker
-### ✅ Build and Run
-```bash
-docker build -t sknai-classifier .
-docker run -p 8080:8080 sknai-classifier
-```
-Then visit: [http://localhost:8080/docs](http://localhost:8080/docs)
-
----
-
 ## ✅ Running the API (Without Docker)
-
--> Run this api before you run the LLM API
-
 ```bash
 python pipelines/deploy_pipeline.py
 ```
@@ -77,17 +64,6 @@ python pipelines/train_pipeline.py
 
 ---
 
-## 🤖 Run Inference on an Image
-```bash
-python pipelines/inference_pipeline.py path/to/image.jpg
-```
-Expected output:
-```
-Prediction: Acne (Confidence: 0.97)
-```
-
----
-
 ## 🧪 Run Tests
 ```bash
 python pipelines/test_pipeline.py
@@ -103,11 +79,29 @@ You’ll see simple PASS/FAIL output for all modules.
 ## 📦 API Endpoints (Swagger UI)
 | Method | Endpoint       | Description  |
 |--------|--------------|--------------|
-| `GET`  | `/`          | Welcome message |
-| `POST` | `/upload`    | Upload an image for classification |
 | `POST` | `/predict`   | Get a disease classification for an uploaded image |
 
 Visit [http://localhost:8080/docs](http://localhost:8080/docs) for Swagger interface.
+
+## 📸 Predict a Skin Disease (via Cloudinary URL)
+
+Use Postman or `curl` to send an image URL.
+
+**POST** `/predict`
+
+**Request Body (JSON)**:
+```json
+{
+  "image_url": "https://res.cloudinary.com/demo/image/upload/v171204/image.png"
+}
+```
+
+**Response**:
+```json
+{
+  "prediction": "eczema"
+}
+```
 
 ---
 
