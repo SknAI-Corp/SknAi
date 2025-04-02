@@ -1,12 +1,29 @@
-import React, { useState, useRef } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Animated, TextInput } from "react-native";
+import React, { useState, useRef, useEffect } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Animated, TextInput, Alert, Modal } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons, Entypo } from "@expo/vector-icons";
+import * as ImagePicker from 'expo-image-picker';
+import { Camera } from 'expo-camera';
+import axios from 'axios';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
+
+const API_BASE_URL = "http://172.20.10.3:8000";
 
 export default function ChatScreen() {
   const router = useRouter();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const slideAnim = useRef(new Animated.Value(300)).current; // Initial position (off-screen)
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [prediction, setPrediction] = useState<string | null>(null);
+  const [confidence, setConfidence] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [permission, setPermission] = useState<boolean | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const openModal = () => setModalVisible(true);
+  const closeModal = () => setModalVisible(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   // Function to open chat
   const openChat = () => {
@@ -27,6 +44,81 @@ export default function ChatScreen() {
     }).start(() => setIsChatOpen(false));
   };
 
+  const [messages, setMessages] = useState([]);
+
+    // Request camera permission
+    useEffect(() => {
+      (async () => {
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        setPermission(status === 'granted');
+      })();
+    }, []);
+  
+    if (permission === null) return <Text>Requesting camera permissions...</Text>;
+    if (permission === false) return <Text>No access to camera</Text>;
+  
+    // Function to pick image from gallery
+    const pickImage = async () => {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+  
+      if (!result.canceled) {
+        setImageUri(result.assets[0].uri);
+        setModalVisible(false);
+      }
+    };
+  
+    // Function to take a photo
+    const takePhoto = async () => {
+      let result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+  
+      if (!result.canceled) {
+        setImageUri(result.assets[0].uri);
+        setModalVisible(false);
+      }
+    };
+  
+    // Upload Image to Cloudinary
+    const uploadImage = async () => {
+      if (!selectedImage) return;
+
+      setUploading(true);
+      let formData = new FormData();
+      const file = new File([selectedImage], "upload.jpg", { type: "image/jpeg" });
+      formData.append("image", file);
+
+      try {
+          const response = await axios.post("http://172.20.10.3:8000/upload", formData, {
+              headers: { "Content-Type": "multipart/form-data" },
+          });
+
+          Alert.alert("Success", "Image uploaded successfully!");
+          console.log("Image URL:", response.data.imageUrl);
+          setSelectedImage(null);
+      } catch (error) {
+          console.error("Upload Error:", error);
+          Alert.alert("Error", "Upload failed!");
+      } finally {
+          setUploading(false);
+      }
+  };
+    
+  
+    // Function to remove the selected image
+    const removeImage = () => {
+      setImageUri(null);
+    };
+
+
   return (
     <View style={styles.container}>
       {/* Header Section */}
@@ -34,12 +126,10 @@ export default function ChatScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
-        <Text style={styles.title}>Chat History</Text>
+        <Text style={styles.title}>Chat</Text>
       </View>
 
-      
-
-      {/* Show "New Chat" button only if chat is closed */}
+      {/* New Chat Button */}
       {!isChatOpen && (
         <TouchableOpacity style={styles.newChatButton} onPress={openChat}>
           <Text style={styles.newChatText}>New Chat</Text>
@@ -47,29 +137,42 @@ export default function ChatScreen() {
         </TouchableOpacity>
       )}
 
-       {/* Chat Input Box */}
-       <Animated.View style={[styles.chatBox, { transform: [{ translateY: slideAnim }] }]}>
-        {/* Attachment Button */}
-        <TouchableOpacity style={styles.iconButton}>
-          <Ionicons name="add" size={24} color="black" />
-        </TouchableOpacity>
-
-        {/* Text Input */}
-        <TextInput style={styles.input} placeholder="Type a message...." placeholderTextColor="#555" />
-
-        {/* Voice Input */}
-        <TouchableOpacity style={styles.iconButton}>
-          <Ionicons name="mic-outline" size={24} color="black" />
-        </TouchableOpacity>
-      </Animated.View>
+      {/* Chat Input Box */}
       {isChatOpen && (
-        <TouchableOpacity style={styles.sendButton}>
+        <View style={styles.chatBox}>
+          <TouchableOpacity style={styles.iconButton} onPress={openModal}>
+            <Ionicons name="add" size={24} color="black" />
+          </TouchableOpacity>
+          <TextInput style={styles.input} placeholder="Type a message..." placeholderTextColor="#555" />
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons name="mic-outline" size={24} color="black" />
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      {isChatOpen && (
+        <TouchableOpacity style={styles.sendButton} onPress={uploadImage} disabled={uploading}>
           <Ionicons name="send" size={35} color="black" />
         </TouchableOpacity>
       )}
 
-      {/* Disclaimer */}
-      <Text style={styles.disclaimer}>SknAI can make mistakes. Check important info.</Text>
+      {/* Modal for Image Upload / Scan Photo */}
+      <Modal visible={modalVisible} transparent animationType="slide">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Choose an Option</Text>
+            <TouchableOpacity style={styles.modalButton} onPress={pickImage}>
+              <Text style={styles.modalText}>Upload Image</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalButton}>
+              <Text style={styles.modalText}>Scan Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.closeModalButton} onPress={closeModal}>
+              <Text style={styles.modalText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -103,20 +206,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
   },
-  emptyContainer: {
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#555",
-  },
-  subText: {
-    fontSize: 14,
-    color: "#888",
-    marginTop: 5,
-  },
   newChatButton: {
     position: "absolute",
     bottom: 50,
@@ -140,7 +229,7 @@ const styles = StyleSheet.create({
   chatBox: {
     position: "absolute",
     bottom: 50,
-    left:40,
+    left: 40,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#E9B08A",
@@ -167,7 +256,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 50,
     right: 10,
-    
     padding: 12,
     borderRadius: 25,
     shadowColor: "#000",
@@ -176,12 +264,38 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 5,
   },
-  disclaimer: {
-    fontSize: 10,
-    color: "gray",
-    position: "absolute",
-    bottom: 10,
-    textAlign: "center",
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalContent: {
+    backgroundColor: "white",
+    padding: 20,
+    borderRadius: 10,
+    width: "80%",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 15,
+  },
+  modalButton: {
+    backgroundColor: "#E9B08A",
+    padding: 10,
+    borderRadius: 5,
+    marginVertical: 5,
+    width: "100%",
+    alignItems: "center",
+  },
+  modalText: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  closeModalButton: {
+    marginTop: 10,
   },
 });
 
