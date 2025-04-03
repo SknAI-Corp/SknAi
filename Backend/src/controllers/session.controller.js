@@ -3,7 +3,6 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Session } from "../models/session.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
-import fs from "fs";
 
 // Create a new session (triggered by "New Chat")
 const createSession = asyncHandler(async (req, res) => {
