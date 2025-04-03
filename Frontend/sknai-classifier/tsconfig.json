@@ -1,6 +1,9 @@
 {
-  "compilerOptions": {},
-  "extends": "expo/tsconfig.base",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "strict": true,
+    "allowSyntheticDefaultImports": true
+  },
   "include": [
     "**/*.ts",
     "**/*.tsx",

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack } from "expo-router";
-import { useState} from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator  } from "react-native";
+import { useState } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
@@ -15,12 +15,6 @@ const LoginScreen = () => {
   const [emailError, setEmailError] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
 
-  const apiClient = axios.create({
-    baseURL: API_BASE_URL,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
   const handleLogin = async () => {
     if (!email || !password) {
       setEmailError(!email);
@@ -32,22 +26,34 @@ const LoginScreen = () => {
     setLoading(true);
     setEmailError(false);
     setPasswordError(false);
+
     try {
-            const response = await apiClient.post("/signin", { email, password });
+      const response = await axios.post(`${API_BASE_URL}/api/v1/users/login`, { email, password }, { withCredentials: true });
 
-            const { token, firstName } = response.data;
-            await AsyncStorage.setItem("userToken", token);
-            Alert.alert("Success", "Login successful!");
-            console.log(response.data);
+      const { accessToken, refreshToken, user } = response.data.data;
+      
+      // Store tokens securely
+      await AsyncStorage.setItem("accessToken", accessToken);
+      await AsyncStorage.setItem("refreshToken", refreshToken);
+      await AsyncStorage.setItem("userInfo", JSON.stringify(user));
+      
+      Alert.alert("Success", "Login successful!");
+      console.log("User Info:", user);
 
-            router.push({ pathname: "/screens/HomeScreen", params: { firstName, token } }); // Navigate to home page after login
-        } catch (error) {
-          console.error(error);
-          Alert.alert("Error", error.response?.data?.message || "Login failed");
-        } finally {
-            setLoading(false);
-        }
-      };
+      // Navigate to HomeScreen with user data
+      router.push({ pathname: "/screens/HomeScreen", params: { firstName: user.firstName, accessToken } });
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+          console.error("Axios Error:", err.response?.data);
+          Alert.alert("Error", err.response?.data?.message || "Login failed");
+      } else {
+          console.error("Unexpected Error:", err);
+          Alert.alert("Error", "Something went wrong. Please try again.");
+      }
+  } finally {
+      setLoading(false);
+  }
+  };
 
   return (
     <>

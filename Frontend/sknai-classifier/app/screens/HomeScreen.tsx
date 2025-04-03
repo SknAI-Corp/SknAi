@@ -9,23 +9,38 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams  } from "expo-router";
 import axios from "axios";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { API_BASE_URL } from "./config";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const HomeScreen = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const slideAnim = useRef(new Animated.Value(-250)).current; // Initial position off-screen
   const router = useRouter();
-   const [firstName, setFirstName] = useState("");
-   const [token, setToken] = useState<string | null>(null);
-  // const { firstName } = useLocalSearchParams();
+  //  const [firstName, setFirstName] = useState("");
 
-  const apiClient = axios.create({
-    baseURL: API_BASE_URL,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+  const [firstName, setFirstName] = useState("");
+  const [token, setToken] = useState<string | null>(null);
+
+  
+useEffect(() => {
+  const fetchUserData = async () => {
+    try {
+      const accessToken = await AsyncStorage.getItem("accessToken");
+      const userInfo = await AsyncStorage.getItem("userInfo");
+
+      if (accessToken && userInfo) {
+        setToken(accessToken); // Store accessToken in state
+        const user = JSON.parse(userInfo); // Convert string back to object
+        setFirstName(user.firstName); // Set firstName from stored user info
+      }
+    } catch (error) {
+      console.error("Error retrieving user data:", error);
+    }
+  };
+
+  fetchUserData();
+}, []);
 
   const toggleMenu = () => {
     Animated.timing(slideAnim, {
@@ -37,31 +52,31 @@ const HomeScreen = () => {
     setMenuOpen(!menuOpen);
   };
 
-  useEffect(() => {
+  // useEffect(() => {
     
     
-    const fetchUserProfile = async () => {
-      try {
-        const token = await AsyncStorage.getItem('userToken');
-        setToken(token);
-        if (!token) {
-          console.log("No token found, skipping API call");
-          return; 
-        }
-        const response = await apiClient.get('/user', {
-          headers: {
-            Authorization: `Bearer ${token}`, // Send token in Authorization header
-          }
-        });
-        console.log(response.data);
-        setFirstName(response.data.firstName);
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-      }
-    };
-    fetchUserProfile();
+  //   const fetchUserProfile = async () => {
+  //     try {
+  //       const token = await AsyncStorage.getItem('userToken');
+  //       setToken(token);
+  //       if (!token) {
+  //         console.log("No token found, skipping API call");
+  //         return; 
+  //       }
+  //       const response = await apiClient.get('/user', {
+  //         headers: {
+  //           Authorization: `Bearer ${token}`, // Send token in Authorization header
+  //         }
+  //       });
+  //       console.log(response.data);
+  //       setFirstName(response.data.firstName);
+  //     } catch (error) {
+  //       console.error('Error fetching profile:', error);
+  //     }
+  //   };
+  //   fetchUserProfile();
   
-  }, [])
+  // }, [])
   
 
   return (

@@ -241,8 +241,8 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
-import userRoutes from "./routes/userRoutes.js";
-import imageRoutes from "./routes/imageRoutes.js";
+import userRoutes from "./src/routes/user.route.js";
+import imageRoutes from "./src/routes/imageRoutes.js";
 
 dotenv.config();
 
