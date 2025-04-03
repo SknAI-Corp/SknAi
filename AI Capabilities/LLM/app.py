@@ -3,14 +3,13 @@ import uuid
 import logging
 import time
 from functools import lru_cache
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from fastapi import APIRouter, HTTPException, FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from motor.motor_asyncio import AsyncIOMotorClient
 import httpx
-
 
 from ingest.pinecone_ops import initialize_pinecone
 from embeddings.model_loader import load_biobert_model
@@ -53,7 +52,8 @@ router = APIRouter()
 class ChatRequest(BaseModel):
     session_id: str
     user_id: str
-    user_message: str
+    user_message: Optional[str] = None
+    predicted_disease: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -90,6 +90,31 @@ def get_memory(user_id: str, session_id: str):
     )
     return memory
 
+def create_disease_only_prompt(disease: str) -> str:
+    """Generate a comprehensive query about a disease when only disease is provided."""
+    return f"""Provide comprehensive information about {disease} covering the following aspects:
+1. Brief overview and definition
+2. Common symptoms and their progression
+3. Causes and risk factors
+4. Diagnostic methods
+5. Standard treatment approaches
+6. Prevention strategies
+7. When to seek medical attention
+8. Long-term management
+
+Format the information in an easy-to-understand way using simple language. Focus on medically accurate information while being empathetic and reassuring where appropriate."""
+
+def determine_query_type(request: ChatRequest) -> str:
+    """Determine which type of query we're handling."""
+    if request.predicted_disease and not request.user_message:
+        return "disease_only"
+    elif request.user_message and not request.predicted_disease:
+        return "query_only"
+    elif request.user_message and request.predicted_disease:
+        return "combined"
+    else:
+        return "invalid"
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_ai(request: ChatRequest):
     request_id = str(uuid.uuid4())
@@ -97,68 +122,126 @@ async def chat_with_ai(request: ChatRequest):
     
     logger.info(f"Request {request_id}: User {request.user_id} sent message in session {request.session_id}")
     
-    if not request.user_message:
-        raise HTTPException(status_code=400, detail="Missing user message")
+    query_type = determine_query_type(request)
+    
+    if query_type == "invalid":
+        raise HTTPException(status_code=400, detail="Either user_message or predicted_disease must be provided")
     
     try:
         memory = get_memory(request.user_id, request.session_id)
-        retriever = vector_store.as_retriever()
-
-        # Contextualize question prompt
-        contextualize_q_system_prompt = (
-            "Given a chat history and the latest user question, "
-            "which might reference context in the chat history, "
-            "formulate a standalone question that can be understood "
-            "without the chat history. Do NOT answer the question, just "
-            "reformulate it if needed and otherwise return it as is."
-        )
-        contextualize_q_prompt = ChatPromptTemplate.from_messages(
-            [
+        chat_history = memory.chat_memory.messages
+        
+        # Case 1: Only predicted disease is provided
+        if query_type == "disease_only":
+            # Create a comprehensive query about the disease
+            effective_query = create_disease_only_prompt(request.predicted_disease)
+            
+            # Create a specialized system prompt for disease information
+            system_prompt = f"""You are a medical assistant providing information about medical conditions. 
+            You have been asked to provide information about {request.predicted_disease}.
+            
+            Provide accurate, comprehensive information about this condition in a structured format.
+            Be informative but also compassionate and reassuring where appropriate.
+            Emphasize the importance of consulting healthcare professionals for proper diagnosis and treatment.
+            Avoid technical jargon when simpler terms can be used, but maintain medical accuracy.
+            
+            If you don't have sufficient information about this specific condition, acknowledge the limitations
+            and suggest general approaches for seeking medical guidance."""
+            
+        # Case 2: Only user query is provided
+        elif query_type == "query_only":
+            effective_query = request.user_message
+            
+            # Contextualize question prompt to handle conversation history
+            contextualize_q_system_prompt = """Given a chat history and the latest user question,
+            which might reference context in the chat history, formulate a standalone question that can be understood
+            without the chat history. Do NOT answer the question, just reformulate it if needed and otherwise return it as is."""
+            
+            contextualize_q_prompt = ChatPromptTemplate.from_messages([
                 ("system", contextualize_q_system_prompt),
                 MessagesPlaceholder("chat_history"),
                 ("human", "{input}"),
-            ]
-        )
-
-        history_aware_retriever = create_history_aware_retriever(
-            get_llm(), retriever, contextualize_q_prompt
-        )
-
-        # Answer question prompt
-        qa_system_prompt = (
-            "You are an assistant for question-answering tasks. Use "
-            "the following retrieved context to answer the question. "
-            "If you don't know the answer, just say that you don't know. "
-            "Keep the answer concise."
-            "Context: {context}"
-        )
-        
-        qa_prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", qa_system_prompt),
+            ])
+            
+            system_prompt = """You are a medical assistant for question-answering tasks. Use
+            the following retrieved context to answer the question.
+            If you don't know the answer, just say that you don't know and suggest consulting a healthcare professional.
+            Keep the answer informative but easy to understand.
+            
+            Context: {context}"""
+            
+        # Case 3: Both user query and predicted disease are provided
+        else:  # combined
+            effective_query = request.user_message
+            
+            # Contextualize question with disease context
+            contextualize_q_system_prompt = f"""Given a chat history and the latest user question,
+            which might reference context in the chat history, formulate a standalone question that can be understood
+            without the chat history. The question may be related to {request.predicted_disease}.
+            Do NOT answer the question, just reformulate it if needed and otherwise return it as is."""
+            
+            contextualize_q_prompt = ChatPromptTemplate.from_messages([
+                ("system", contextualize_q_system_prompt),
                 MessagesPlaceholder("chat_history"),
-                ("human", "Question: {input}"),
-            ]
-        )
-
+                ("human", "{input}"),
+            ])
+            
+            system_prompt = f"""You are a medical assistant for question-answering tasks. Use
+            the following retrieved context to answer the question. The user's question may be related to
+            {request.predicted_disease}, so consider this condition as you formulate your response.
+            
+            If you don't know the answer, just say that you don't know and suggest consulting a healthcare professional.
+            Keep the answer informative but easy to understand.
+            
+            Context: {{context}}"""
+        
+        # Set up retriever with appropriate context
+        retriever = vector_store.as_retriever(search_kwargs={"k": 5})
+        
+        # Only use history-aware retriever for query_only and combined cases
+        if query_type != "disease_only":
+            contextualize_q_prompt = ChatPromptTemplate.from_messages([
+                ("system", contextualize_q_system_prompt),
+                MessagesPlaceholder("chat_history"),
+                ("human", "{input}"),
+            ])
+            
+            history_aware_retriever = create_history_aware_retriever(
+                get_llm(), retriever, contextualize_q_prompt
+            )
+            retriever_to_use = history_aware_retriever
+        else:
+            # For disease-only, we don't need the history-aware component
+            retriever_to_use = retriever
+        
+        # Create the QA prompt
+        qa_prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            MessagesPlaceholder("chat_history"),
+            ("human", "Question: {input}"),
+        ])
+        
+        # Create the QA chain
         question_answer_chain = create_stuff_documents_chain(get_llm(), qa_prompt)
-        rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
-
-        # Get the current chat history from memory
-        chat_history = memory.chat_memory.messages
+        rag_chain = create_retrieval_chain(retriever_to_use, question_answer_chain)
         
         # Execute the chain
         response = await rag_chain.ainvoke({
-            "input": request.user_message,
-            "chat_history": chat_history
+            "input": effective_query,
+            "chat_history": chat_history if query_type != "disease_only" else []
         })
         
         # Extract the answer from the response
         ai_response = response["answer"]
         
-        # Add the user message and AI response to memory
-        memory.chat_memory.add_user_message(request.user_message)
-        memory.chat_memory.add_ai_message(ai_response)
+        # Add the interaction to memory, except for disease-only queries
+        if query_type != "disease_only":
+            memory.chat_memory.add_user_message(request.user_message)
+            memory.chat_memory.add_ai_message(ai_response)
+        else:
+            # For disease-only queries, we might want to add context about what disease info was provided
+            memory.chat_memory.add_user_message(f"Please tell me about {request.predicted_disease}")
+            memory.chat_memory.add_ai_message(ai_response)
 
         # Measure processing time
         processing_time = time.time() - start_time
@@ -179,11 +262,3 @@ async def chat_with_ai(request: ChatRequest):
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
     
 app.include_router(router)
-
-
-
-
-
-
-
-
