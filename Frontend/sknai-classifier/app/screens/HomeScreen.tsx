@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,12 +7,25 @@ import {
   Image,
   Animated,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams  } from "expo-router";
+import axios from "axios";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from "./config";
 
 const HomeScreen = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const slideAnim = useRef(new Animated.Value(-250)).current; // Initial position off-screen
   const router = useRouter();
+   const [firstName, setFirstName] = useState("");
+   const [token, setToken] = useState<string | null>(null);
+  // const { firstName } = useLocalSearchParams();
+
+  const apiClient = axios.create({
+    baseURL: API_BASE_URL,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
 
   const toggleMenu = () => {
     Animated.timing(slideAnim, {
@@ -24,6 +37,33 @@ const HomeScreen = () => {
     setMenuOpen(!menuOpen);
   };
 
+  useEffect(() => {
+    
+    
+    const fetchUserProfile = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        setToken(token);
+        if (!token) {
+          console.log("No token found, skipping API call");
+          return; 
+        }
+        const response = await apiClient.get('/user', {
+          headers: {
+            Authorization: `Bearer ${token}`, // Send token in Authorization header
+          }
+        });
+        console.log(response.data);
+        setFirstName(response.data.firstName);
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      }
+    };
+    fetchUserProfile();
+  
+  }, [])
+  
+
   return (
     <View style={styles.container}>
       {/* Overlay when menu is open */}
@@ -31,34 +71,37 @@ const HomeScreen = () => {
 
       {/* Sidebar Menu */}
       <Animated.View style={[styles.sidebar, { left: slideAnim }]}>
-        <Image
-          source={{ uri: "https://via.placeholder.com/80" }}
-          style={styles.profileImage}
-        />
-        <Text style={styles.userName}>Steve</Text>
+        <Image source={require("../../assets/images/user.png")} style={styles.profileImage} />
+        <Text style={styles.userName}>{firstName || "Guest"}</Text>
 
         <TouchableOpacity style={styles.menuItem}>
           
-          <Image source={require("../../assets/images/home.png")}></Image>
+        <Text style={styles.menuText}><Image source={require("../../assets/images/home.png")}></Image>Home</Text>
+          
         </TouchableOpacity>
         <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuText}>👤 Profile</Text>
+        <Text style={styles.menuText}><Image source={require("../../assets/images/profile.png")}></Image> Profile</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuText}>🔔 Notifications</Text>
+        <Text style={styles.menuText}><Image source={require("../../assets/images/Notifications.png")}></Image> Notifications</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuText}>🗂 Chat History</Text>
+        <Text style={styles.menuText}><Image source={require("../../assets/images/Chat History.png")}></Image> Chat History</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuText}>📑 Doctor’s Report</Text>
+        <Text style={styles.menuText}><Image source={require("../../assets/images/Doctor.png")}></Image> Doctor's Report</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuText}>⚙️ Settings</Text>
+        <Text style={styles.menuText}><Image source={require("../../assets/images/Settings.png")}></Image> Settings</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuText}>🚪 Sign out</Text>
+
+        {token &&(
+
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push("/screens/Logout")}>
+          <Text style={styles.menuText}><Image source={require("../../assets/images/signout.png")}></Image>Sign out</Text>
         </TouchableOpacity>
+        )}
+
       </Animated.View>
 
       {/* Menu Button */}
@@ -68,7 +111,7 @@ const HomeScreen = () => {
 
       {/* Greeting */}
       <Text style={styles.greeting}>
-        <Text style={styles.greetingHighlight}>Good Morning,</Text> Steve
+        <Text style={styles.greetingHighlight}>Good Morning,</Text> {firstName || "Guest"}!
       </Text>
 
       {/* "Did You Know?" Section */}
@@ -133,12 +176,15 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 0,
     left: 0,
+    bottom:20,
     width: 250,
-    height: "100%",
+    height: 760,
     backgroundColor: "#E9B08A",
-    paddingTop: 60,
-    paddingLeft: 20,
-    zIndex: 2,
+    paddingTop: 20,
+    paddingRight: 50,
+    zIndex: 6,
+    textAlign:"center",
+    alignItems:"center"
   },
   profileImage: {
     width: 80,
@@ -156,6 +202,7 @@ const styles = StyleSheet.create({
   },
   menuText: {
     fontSize: 16,
+    
     color: "#000",
   },
   menuButton: {

@@ -1,11 +1,53 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack } from "expo-router";
-import React from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
+import { useState} from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator  } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
+import { API_BASE_URL } from "./config";
 
 const LoginScreen = () => {
   const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [emailError, setEmailError] = useState(false);
+  const [passwordError, setPasswordError] = useState(false);
+
+  const apiClient = axios.create({
+    baseURL: API_BASE_URL,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setEmailError(!email);
+      setPasswordError(!password);
+      Alert.alert("Error", "Please enter email and password");
+      return;
+    }
+
+    setLoading(true);
+    setEmailError(false);
+    setPasswordError(false);
+    try {
+            const response = await apiClient.post("/signin", { email, password });
+
+            const { token, firstName } = response.data;
+            await AsyncStorage.setItem("userToken", token);
+            Alert.alert("Success", "Login successful!");
+            console.log(response.data);
+
+            router.push({ pathname: "/screens/HomeScreen", params: { firstName, token } }); // Navigate to home page after login
+        } catch (error) {
+          console.error(error);
+          Alert.alert("Error", error.response?.data?.message || "Login failed");
+        } finally {
+            setLoading(false);
+        }
+      };
 
   return (
     <>
@@ -25,25 +67,35 @@ const LoginScreen = () => {
         <View style={styles.formContainer}>
           {/* Username Input */}
           <Text style={styles.label}>User name</Text>
-          <View style={styles.inputContainer}>
+          <View style={[styles.inputContainer , emailError && styles.errorBorder]}>
           
             <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
             <TextInput 
               placeholder="User name"
               placeholderTextColor="#666"
               style={styles.input}
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                setEmailError(false);
+              }}
               autoCapitalize="none"
             />
           </View>
 
           {/* Password Input */}
           <Text style={styles.label}>Password</Text>
-          <View style={styles.inputContainer}>
+          <View style={[styles.inputContainer , passwordError && styles.errorBorder]}>
             <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
             <TextInput 
               placeholder="Password"
               placeholderTextColor="#666"
               secureTextEntry
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                setPasswordError(false);
+              }}
               style={styles.input}
             />
           </View>
@@ -60,9 +112,9 @@ const LoginScreen = () => {
         {/* Login Button */}
         <TouchableOpacity 
           style={styles.button}
-          onPress={() => router.push("/screens/HomeScreen")}
+          onPress={handleLogin} disabled={loading}
         >
-          <Text style={styles.buttonText}>Log in</Text>
+           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Login</Text>}
         </TouchableOpacity>
 
         {/* Guest Button */}
@@ -178,6 +230,10 @@ const styles = StyleSheet.create({
     elevation: 5,
     // padding: 25, 125, 25, 125,
 
+
+  },
+  errorBorder: {
+    borderColor: "red",
 
   },
   buttonText: {
