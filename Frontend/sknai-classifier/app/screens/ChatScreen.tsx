@@ -6,8 +6,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { Camera } from 'expo-camera';
 import axios from 'axios';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
+import { API_BASE_URL } from "./config";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_BASE_URL = "http://172.20.10.3:8000";
 
 export default function ChatScreen() {
   const router = useRouter();
@@ -24,15 +25,31 @@ export default function ChatScreen() {
   const closeModal = () => setModalVisible(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [sessionData, setSessionData] = useState(null);
+  const [token, setToken] = useState<string | null>(null);
 
   // Function to open chat
-  const openChat = () => {
+  const openChat = async() => {
     Animated.timing(slideAnim, {
       toValue: 0, // Slide into view
       duration: 300,
       useNativeDriver: true,
     }).start();
     setIsChatOpen(true);
+    const accessToken = await AsyncStorage.getItem("accessToken");
+    
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/v1/session/`, // Replace with your actual backend URL
+        {}, // No need to send the title from the frontend
+        { headers: { Authorization: `Bearer ${accessToken}` } } // Add your authentication token if necessary
+      );
+      setSessionData(response.data.data); // Assuming the response contains session data
+      alert(response.data.message); // Show success message
+    } catch (error) {
+      console.error('Error creating new session', error);
+      alert('Failed to create new session');
+    }
   };
 
   // Function to close chat

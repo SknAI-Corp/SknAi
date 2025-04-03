@@ -6,6 +6,8 @@ import {
   StyleSheet,
   Image,
   Animated,
+  ScrollView,
+  ActivityIndicator, 
 } from "react-native";
 import { useRouter, useLocalSearchParams  } from "expo-router";
 import axios from "axios";
@@ -21,6 +23,8 @@ const HomeScreen = () => {
 
   const [firstName, setFirstName] = useState("");
   const [token, setToken] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   
 useEffect(() => {
@@ -38,6 +42,21 @@ useEffect(() => {
       console.error("Error retrieving user data:", error);
     }
   };
+  const fetchSessions = async () => {
+    try {
+      const accessToken = await AsyncStorage.getItem("accessToken");
+      const response = await axios.get(`${API_BASE_URL}/api/v1/session/`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setSessions(response.data.data); // Assuming `data` contains sessions array
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchSessions();
 
   fetchUserData();
 }, []);
@@ -51,32 +70,6 @@ useEffect(() => {
 
     setMenuOpen(!menuOpen);
   };
-
-  // useEffect(() => {
-    
-    
-  //   const fetchUserProfile = async () => {
-  //     try {
-  //       const token = await AsyncStorage.getItem('userToken');
-  //       setToken(token);
-  //       if (!token) {
-  //         console.log("No token found, skipping API call");
-  //         return; 
-  //       }
-  //       const response = await apiClient.get('/user', {
-  //         headers: {
-  //           Authorization: `Bearer ${token}`, // Send token in Authorization header
-  //         }
-  //       });
-  //       console.log(response.data);
-  //       setFirstName(response.data.firstName);
-  //     } catch (error) {
-  //       console.error('Error fetching profile:', error);
-  //     }
-  //   };
-  //   fetchUserProfile();
-  
-  // }, [])
   
 
   return (
@@ -86,38 +79,49 @@ useEffect(() => {
 
       {/* Sidebar Menu */}
       <Animated.View style={[styles.sidebar, { left: slideAnim }]}>
-        <Image source={require("../../assets/images/user.png")} style={styles.profileImage} />
-        <Text style={styles.userName}>{firstName || "Guest"}</Text>
-
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerText}>SknAI</Text>
+        </View>
         <TouchableOpacity style={styles.menuItem}>
           
-        <Text style={styles.menuText}><Image source={require("../../assets/images/home.png")}></Image>Home</Text>
+         <Text style={styles.menuText}><Image source={require("../../assets/images/home.png")}></Image>Home</Text>
           
         </TouchableOpacity>
         <TouchableOpacity style={styles.menuItem}>
-        <Text style={styles.menuText}><Image source={require("../../assets/images/profile.png")}></Image> Profile</Text>
+          
+         <Text style={styles.menuText}><Image source={require("../../assets/images/Doctor.png")}></Image>Doctor's Report</Text>
+          
         </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem}>
-        <Text style={styles.menuText}><Image source={require("../../assets/images/Notifications.png")}></Image> Notifications</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem}>
-        <Text style={styles.menuText}><Image source={require("../../assets/images/Chat History.png")}></Image> Chat History</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem}>
-        <Text style={styles.menuText}><Image source={require("../../assets/images/Doctor.png")}></Image> Doctor's Report</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem}>
-        <Text style={styles.menuText}><Image source={require("../../assets/images/Settings.png")}></Image> Settings</Text>
-        </TouchableOpacity>
-
-        {token &&(
-
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push("/screens/Logout")}>
-          <Text style={styles.menuText}><Image source={require("../../assets/images/signout.png")}></Image>Sign out</Text>
-        </TouchableOpacity>
+        <Text style={styles.title}>Chat History</Text>
+  <ScrollView style={styles.menuContainer}>
+  {loading ? (
+          <ActivityIndicator size="large" color="#000" />
+        ) : sessions.length > 0 ? (
+          sessions?.map((session, index) => (
+            <TouchableOpacity key={session?._id || index} style={styles.chatItem}>
+              <Text style={styles.chatText}>{session?.title || "Unnamed Session"}</Text>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <Text style={styles.noSessionsText}>No sessions found</Text>
         )}
+  </ScrollView>
 
-      </Animated.View>
+  {/* User Profile Footer */}
+  <TouchableOpacity onPress={()=> router.push("/screens/SettingScreen")}>
+    <View style={styles.footer}>
+      <Image source={require("../../assets/images/user.png")} style={styles.profileImage} />
+      <Text style={styles.userName}>{firstName || "Guest"}</Text>
+    </View>
+  </TouchableOpacity>
+  {token && (
+    <TouchableOpacity style={styles.menuItem} onPress={() => router.push("/screens/Logout")}>
+      <Image source={require("../../assets/images/signout.png")} style={styles.menuIcon} />
+      <Text style={styles.menuText}>Sign out</Text>
+    </TouchableOpacity>
+  )}
+</Animated.View>
 
       {/* Menu Button */}
       <TouchableOpacity style={styles.menuButton} onPress={toggleMenu}>
@@ -178,6 +182,20 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: "center",
   },
+  header: {
+    alignItems: "center",
+    paddingVertical: 15,
+    backgroundColor: "#E9B08A",
+    // borderBottomWidth: 1,
+    // borderBottomColor: "#ccc",
+  },
+  headerText: {
+    fontSize: 35,
+    fontWeight: "bold",
+    color: "#333",
+    alignItems:"center",
+    marginLeft:50
+  },
   overlay: {
     position: "absolute",
     top: 0,
@@ -187,47 +205,131 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
     zIndex: 1,
   },
+  chatItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderColor: "#D9D9D9",
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    marginTop:50
+  },
+  chatText: {
+    fontSize: 14,
+    color: "#000",
+    fontWeight: "500",
+  },
+  noSessionsText: {
+    textAlign: "center",
+    padding: 20,
+    fontSize: 16,
+    color: "gray",
+  },
+  // sidebar: {
+  //   position: "absolute",
+  //   top: 0,
+  //   left: 0,
+  //   bottom:20,
+  //   width: 250,
+  //   height: 760,
+  //   backgroundColor: "#E9B08A",
+  //   paddingTop: 20,
+  //   paddingRight: 50,
+  //   zIndex: 6,
+  //   textAlign:"center",
+  //   alignItems:"center"
+  // },
+  // profileImage: {
+  //   width: 80,
+  //   height: 80,
+  //   borderRadius: 40,
+  //   marginBottom: 10,
+  // },
+  // userName: {
+  //   fontSize: 18,
+  //   fontWeight: "bold",
+  //   marginBottom: 20,
+  // },
+  // menuItem: {
+  //   paddingVertical: 25,
+  // },
+  // menuText: {
+  //   fontSize: 16,
+    
+  //   color: "#000",
+  // },
+  // menuButton: {
+  //   position: "absolute",
+  //   top: 20,
+  //   left: 25,
+  //   zIndex: 3,
+  // },
+  // menuIcon: {
+  //   fontSize: 40,
+  // },
   sidebar: {
     position: "absolute",
     top: 0,
     left: 0,
-    bottom:20,
+    bottom: 0,
     width: 250,
-    height: 760,
     backgroundColor: "#E9B08A",
     paddingTop: 20,
-    paddingRight: 50,
+    paddingHorizontal: 15,
     zIndex: 6,
-    textAlign:"center",
-    alignItems:"center"
+    alignItems: "flex-start",
+    justifyContent: "space-between",
   },
-  profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 10,
-  },
-  userName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 20,
+  menuContainer: {
+    flex: 1,
+    width: "100%",
   },
   menuItem: {
-    paddingVertical: 25,
-  },
-  menuText: {
-    fontSize: 16,
-    
-    color: "#000",
-  },
-  menuButton: {
-    position: "absolute",
-    top: 20,
-    left: 25,
-    zIndex: 3,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    width: "100%",
+    borderRadius: 8,
   },
   menuIcon: {
-    fontSize: 40,
+    fontSize:40,
+    marginRight: 10,
+  },
+  menuText: {
+    fontSize: 14,
+    color: "#000",
+    fontWeight: "500",
+  },
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderTopWidth: 1,
+    borderColor: "#D9D9D9",
+  },
+  menuButton: {
+      position: "absolute",
+      top: 20,
+      left: 25,
+      zIndex: 3,
+    },
+  profileImage: {
+    width: 40,
+
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  userName: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#000",
   },
   greeting: {
     fontSize: 30,
