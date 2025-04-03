@@ -42,11 +42,7 @@ const registerUser = asyncHandler(async (req, res) => {
     }
   
     const newUser = await User.create({
-<<<<<<< Updated upstream
-      firstName, 
-=======
       firstName,
->>>>>>> Stashed changes
       lastName,
       email: email.toLowerCase(),
       password,

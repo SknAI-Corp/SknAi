@@ -8,12 +8,8 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-<<<<<<< Updated upstream
-  lastName: {
-=======
 
   lastName:{
->>>>>>> Stashed changes
     type: String,
     required: true,
     trim: true
