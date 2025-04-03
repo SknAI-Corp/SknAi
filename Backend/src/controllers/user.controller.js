@@ -42,7 +42,11 @@ const registerUser = asyncHandler(async (req, res) => {
     }
   
     const newUser = await User.create({
+<<<<<<< Updated upstream
       firstName, 
+=======
+      firstName,
+>>>>>>> Stashed changes
       lastName,
       email: email.toLowerCase(),
       password,
@@ -50,7 +54,7 @@ const registerUser = asyncHandler(async (req, res) => {
       profileImage: uploadedProfileImage?.url || null
     });
   
-    const sanitizedUser = await User.findById(newUser._id).select("-passwordHash -refreshToken");
+    const sanitizedUser = await User.findById(newUser._id).select("-password -refreshToken");
   
     return res.status(201).json(
       new ApiResponse("User registered successfully", sanitizedUser, 201)
@@ -78,7 +82,7 @@ const loginUser = asyncHandler(async (req, res) => {
   
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
   
-    const userInfo = await User.findById(user._id).select("-passwordHash -refreshToken");
+    const userInfo = await User.findById(user._id).select("-password -refreshToken");
   
     const options = {
       httpOnly: true,
@@ -123,7 +127,6 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     }
   
     try {
-      console.log(REFRESH_TOKEN_SECRET)
       const decoded = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET);
       const user = await User.findById(decoded?._id);
   

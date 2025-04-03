@@ -8,7 +8,12 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+<<<<<<< Updated upstream
   lastName: {
+=======
+
+  lastName:{
+>>>>>>> Stashed changes
     type: String,
     required: true,
     trim: true
@@ -60,7 +65,7 @@ userSchema.methods.isPasswordCorrect = async function (password) {
 userSchema.methods.generateAccessToken = function() {
   return jwt.sign({ 
       userId: this._id,
-      username: this.username,
+      firstName: this.firstName,
       email: this.email,
       }, 
       process.env.ACCESS_TOKEN,

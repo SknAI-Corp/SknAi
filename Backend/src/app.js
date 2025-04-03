@@ -14,7 +14,10 @@ app.use(express.static('/public'))
 app.use(cookieParser());
 
 import userRouter from './routes/user.route.js'
+import sessionRouter from './routes/session.route.js'
+
 app.use("/api/v1/users", userRouter)
+app.use("/api/v1/session", sessionRouter)
 
 // http://localhost:8000/api/v1/users/register
 
