@@ -11,9 +11,13 @@ const sendMessage = asyncHandler(async (req, res) => {
   const { sessionId } = req.body;
   const userMessage = req.body.content;
 
-  if (!sessionId || !userMessage) {
-    throw new ApiError(400, "sessionId and content are required");
-  }
+  // if (!sessionId || !userMessage) {
+  //   throw new ApiError(400, "sessionId and content are required");
+  // }
+
+  if (!sessionId) {
+       throw new ApiError(400, "sessionId are required");
+    }
 
   // 1. Validate session
   const session = await Session.findById(sessionId);

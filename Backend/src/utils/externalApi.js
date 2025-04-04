@@ -2,7 +2,7 @@ import axios from "axios";
 
 export const callClassifierAPI = async (imageUrl) => {
   try {
-    const res = await axios.post("http://127.0.0.1:8080/predict", {
+    const res = await axios.post("http://172.20.10.3:8080/predict", {
       image_url: imageUrl
     });
     return res.data?.prediction || null;
@@ -14,7 +14,7 @@ export const callClassifierAPI = async (imageUrl) => {
 
 export const callQnAAPI = async ({ user_message, predicted_disease, session_id }) => {
   try {
-    const res = await axios.post("http://127.0.0.1:5000/chat", {
+    const res = await axios.post("http://127.0.0.1:8081/chat", {
       user_message,
       user_id:"123456", //TODO: SHould be removed
       predicted_disease,

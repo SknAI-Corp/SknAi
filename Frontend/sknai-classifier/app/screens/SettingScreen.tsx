@@ -1,11 +1,41 @@
 import React from "react";
-import { View, Text, Switch, Image, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, Switch, Image, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { Avatar } from "react-native-paper";
 import { Ionicons, Feather, MaterialIcons } from "@expo/vector-icons";
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import axios from 'axios';
+import { API_BASE_URL } from "./config";
 const SettingScreen = () => {
   const [faceIdEnabled, setFaceIdEnabled] = React.useState(true);
   const [silentNotifications, setSilentNotifications] = React.useState(false);
+    const router = useRouter();
+  const handleLogout = async () => {
+    try {
+      const accessToken = await AsyncStorage.getItem('accessToken'); 
+      if (!accessToken) {
+        throw new Error('Access token is missing');
+      }
+      // Make a request to the backend to clear cookies and logout user
+      await axios.post(`${API_BASE_URL}/api/v1/users/logout`, {}, {
+        withCredentials: true, // Ensure cookies are sent with the request
+        headers: {
+          'Authorization': `Bearer ${accessToken}`, // Pass the valid token
+        }
+      });
+
+      // Clear user token from AsyncStorage
+      await AsyncStorage.removeItem('accessToken');
+      
+      // Optionally, you can show an alert for confirmation before navigating
+      Alert.alert('Success', 'You have been logged out', [
+        { text: 'OK', onPress: () => router.push('/screens/LoginScreen') }
+      ]);
+    } catch (error) {
+      console.error('Logout failed', error);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    }
+  };
 
   return (
     <View style={styles.container}>
