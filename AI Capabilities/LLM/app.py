@@ -229,5 +229,27 @@ async def end_session(session_id: str):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@router.post("/debug/test-retrieval")
+async def test_retrieval(request: ChatRequest):
+    # Run with retrieval
+    response_with_retrieval = await chat_with_ai(request)
+    
+    # Run without retrieval by creating a direct prompt to the LLM
+    llm = get_llm()
+    direct_prompt = ChatPromptTemplate.from_messages([
+        ("system", "You are a medical assistant."),
+        ("human", request.user_message)
+    ])
+    
+    # Use the LLM to generate a response without retrieval
+    chain = direct_prompt | llm
+    response_without_retrieval = await chain.ainvoke({"input": request.user_message})
+    
+    return {
+        "with_retrieval": response_with_retrieval.response,
+        "without_retrieval": response_without_retrieval.content,
+        "comparison": "Different" if response_with_retrieval.response != response_without_retrieval.content else "Same"
+    }
+    
 # Register router
 app.include_router(router)
