@@ -30,7 +30,7 @@ from embeddings.embedder import embed_text
 # Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
-
+    
 # Configuration
 MONGO_URI = os.getenv("MONGO_URI")
 DB_NAME = os.getenv("MONGO_DB_NAME", "sknai")
@@ -68,11 +68,17 @@ class ChatResponse(BaseModel):
     processing_time: Optional[float] = None
 
 # ---------------------- Utils ---------------------- #
+# @lru_cache()
+# def get_llm():
+#     logger.info(f"Initializing Mistral LLM with model {MISTRAL_MODEL}")
+#     return ChatMistralAI(model=MISTRAL_MODEL, temperature=LLM_TEMPERATURE, mistral_api_key=MISTRAL_API_KEY)
+
+
+from langchain.chat_models import ChatOpenAI
 @lru_cache()
 def get_llm():
-    logger.info(f"Initializing Mistral LLM with model {MISTRAL_MODEL}")
-    return ChatMistralAI(model=MISTRAL_MODEL, temperature=LLM_TEMPERATURE, mistral_api_key=MISTRAL_API_KEY)
-
+    logger.info(f"Initializing ChatGPT LLM ")
+    return ChatOpenAI(model="gpt-4o-mini", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
 def get_message_history(session_id: str):
     redis_url = f"redis://{os.getenv('REDIS_USERNAME')}:{os.getenv('REDIS_PASSWORD')}@{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}"
     return RedisChatMessageHistory(url=redis_url, session_id=session_id)
@@ -101,15 +107,19 @@ async def rehydrate_memory_from_mongo(memory, session_id: str):
         logger.error(f"[MongoDB] Rehydration error for session {session_id}: {str(e)}")
 
 def create_disease_only_prompt(disease: str) -> str:
-    return f"""Provide comprehensive information about {disease} covering:
-1. Overview
-2. Symptoms
-3. Causes
-4. Diagnosis
-5. Treatment
-6. Prevention
-7. When to seek help
-8. Long-term care
+   return f"""You are an AI Dermatology Assistant. A user uploaded an image which our system identified as possibly showing signs of **{disease}**.
+
+Provide a medically-informed yet easy-to-understand summary covering:
+1. Overview of {disease}
+2. Common Symptoms
+3. Likely Causes
+4. How it's Diagnosed
+5. Treatment Options
+6. Prevention Tips
+7. When to Seek a Dermatologist
+8. Long-term Care Advice
+
+Be concise, reliable, and use plain language suitable for a non-medical audience. Use Bullet points for clarity.
 """
 def log_and_invoke(chain, inputs):
     logger.info("📤 Final input to LLM:")
@@ -152,12 +162,21 @@ async def chat_with_ai(request: ChatRequest):
 Context: {{context}}"""
         elif query_type == "query_only":
             effective_query = request.user_message
-            system_prompt = """You are a medical assistant. Use the context to answer.
-Context: {context}"""
+            system_prompt = """You are an AI Dermatology Assistant. A user has asked a skin-related question. Use verified dermatology knowledge only to provide your answer.
+
+            Always stay within dermatology. Do not discuss unrelated topics. Use bullet points for clarity.
+
+            Context: {context}"""
         else:
             effective_query = request.user_message
-            system_prompt = f"""You are a medical assistant. Disease detected: {request.predicted_disease}.
-Context: {{context}}"""
+            system_prompt = f"""You are an AI Dermatology Assistant. A user uploaded an image, and the system predicted the condition might be **{request.predicted_disease}**. They also asked a follow-up question.
+
+            Use the predicted condition as context and combine it with their query to give a personalized, helpful answer.
+
+            Only rely on medically approved dermatological information. Avoid speculation. Use Bullet points for clarity.
+
+            Context: {{context}}"""
+
 
         # Retriever
         retriever = vector_store.as_retriever(search_kwargs={"k": 5})
