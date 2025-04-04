@@ -129,10 +129,6 @@ const sendMessage = asyncHandler(async (req, res) => {
   if (imageUrl) {
     predictedDisease = await callClassifierAPI(imageUrl);
   }
-<<<<<<< Updated upstream
-=======
-  console.log("user msg", userMsg)
->>>>>>> Stashed changes
   console.log(predictedDisease)
 
   // 🤖 Call Langchain QnA
@@ -153,9 +149,20 @@ const sendMessage = asyncHandler(async (req, res) => {
     userId: req.user._id
   });
 
+  // 📝 Auto-update session title only if it's still "Untitled Chat"
+  const existingMessages = await Message.countDocuments({ sessionId });
+
+  if (existingMessages <= 2 && session.title === "Untitled Chat") {
+    session.title = aiReply.response.slice(0, 20).replace(/\n/g, " ");
+    session.updatedAt = new Date();
+    await session.save();
+  }
+
+
   return res.status(201).json(
     new ApiResponse("Message and response saved", {
       sessionId: session._id,
+      sessionTitle: session.title,
       userMessage: userMsg,
       aiMessage: aiMsg
     }, 201)
