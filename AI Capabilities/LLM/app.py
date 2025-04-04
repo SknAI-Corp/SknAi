@@ -312,10 +312,6 @@ class ChatResponse(BaseModel):
 from langchain.chat_models import ChatOpenAI
 @lru_cache()
 def get_llm():
-<<<<<<< Updated upstream
-    logger.info(f"Initializing ChatGPT LLM ")
-    return ChatOpenAI(model="gpt-4o-mini", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
-=======
     logger.info(f"Initializing Mistral LLM with model {MISTRAL_MODEL}")
     return ChatMistralAI(model=MISTRAL_MODEL, temperature=LLM_TEMPERATURE, mistral_api_key=MISTRAL_API_KEY)
 
@@ -325,7 +321,6 @@ def get_llm():
 # def get_llm():
 #     logger.info(f"Initializing ChatGPT LLM ")
 #     return ChatOpenAI(model="gpt-4o-mini", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
->>>>>>> Stashed changes
 def get_message_history(session_id: str):
     redis_url = f"redis://{os.getenv('REDIS_USERNAME')}:{os.getenv('REDIS_PASSWORD')}@{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}"
     return RedisChatMessageHistory(url=redis_url, session_id=session_id)
