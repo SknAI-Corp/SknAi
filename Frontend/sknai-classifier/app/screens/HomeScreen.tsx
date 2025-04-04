@@ -7,7 +7,8 @@ import {
   Image,
   Animated,
   ScrollView,
-  ActivityIndicator, 
+  ActivityIndicator,
+  Alert, 
 } from "react-native";
 import { useRouter, useLocalSearchParams  } from "expo-router";
 import axios from "axios";
@@ -99,10 +100,11 @@ useEffect(() => {
           <ActivityIndicator size="large" color="#000" />
         ) : sessions.length > 0 ? (
           sessions?.map((session, index) => (
-            <TouchableOpacity key={session?._id || index} style={styles.chatItem}>
+            <TouchableOpacity key={session?._id || index} style={styles.chatItem} >
               <Text style={styles.chatText}>{session?.title || "Unnamed Session"}</Text>
             </TouchableOpacity>
           ))
+          
         ) : (
           <Text style={styles.noSessionsText}>No sessions found</Text>
         )}
@@ -115,12 +117,12 @@ useEffect(() => {
       <Text style={styles.userName}>{firstName || "Guest"}</Text>
     </View>
   </TouchableOpacity>
-  {token && (
+  {/* {token && (
     <TouchableOpacity style={styles.menuItem} onPress={() => router.push("/screens/Logout")}>
       <Image source={require("../../assets/images/signout.png")} style={styles.menuIcon} />
       <Text style={styles.menuText}>Sign out</Text>
     </TouchableOpacity>
-  )}
+  )} */}
 </Animated.View>
 
       {/* Menu Button */}

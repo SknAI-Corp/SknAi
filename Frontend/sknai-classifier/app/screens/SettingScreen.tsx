@@ -39,6 +39,9 @@ const SettingScreen = () => {
 
   return (
     <View style={styles.container}>
+       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                <Ionicons name="arrow-back" size={24} color="black" />
+              </TouchableOpacity>
       {/* Profile Section */}
       <View style={styles.profileSection}>
         <Avatar.Image 
@@ -90,7 +93,7 @@ const SettingScreen = () => {
         </View>
 
         {/* Logout */}
-        <TouchableOpacity style={styles.option}>
+        <TouchableOpacity style={styles.option} onPress={handleLogout}>
           <View style={styles.optionRow}>
             <MaterialIcons name="logout" size={24} color="black" />
             <Text style={styles.optionTitle}>Logout</Text>
@@ -152,6 +155,14 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 12,
     color: "gray",
+  },
+  backButton: {
+    position: "absolute",
+    left: 10,
+    backgroundColor: "#E9B08A",
+    padding: 10,
+    // marginRight: 20,
+    borderRadius: 20,
   },
 });
 

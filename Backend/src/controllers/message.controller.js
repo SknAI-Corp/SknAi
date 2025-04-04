@@ -129,6 +129,10 @@ const sendMessage = asyncHandler(async (req, res) => {
   if (imageUrl) {
     predictedDisease = await callClassifierAPI(imageUrl);
   }
+<<<<<<< Updated upstream
+=======
+  console.log("user msg", userMsg)
+>>>>>>> Stashed changes
   console.log(predictedDisease)
 
   // 🤖 Call Langchain QnA
