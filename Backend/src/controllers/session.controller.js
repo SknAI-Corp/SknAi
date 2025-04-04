@@ -5,22 +5,22 @@ import { Session } from "../models/session.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
 // Create a new session (triggered by "New Chat")
-const createSession = asyncHandler(async (req, res) => {
-  const { title } = req.body;
+// const createSession = asyncHandler(async (req, res) => {
+//   const { title } = req.body;
 
-  if (title && typeof title !== "string") {
-    throw new ApiError(400, "Session title must be a string");
-  }
+//   if (title && typeof title !== "string") {
+//     throw new ApiError(400, "Session title must be a string");
+//   }
 
-  const session = await Session.create({
-    userId: req.user._id,
-    title: title?.trim() || "Untitled Chat"
-  });
+//   const session = await Session.create({
+//     userId: req.user._id,
+//     title: title?.trim() || "Untitled Chat"
+//   });
 
-  return res
-    .status(201)
-    .json(new ApiResponse("Session created successfully", session, 201));
-});
+//   return res
+//     .status(201)
+//     .json(new ApiResponse("Session created successfully", session, 201));
+// });
 
 // Get all sessions for current user
 const getUserSessions = asyncHandler(async (req, res) => {
@@ -96,7 +96,7 @@ const updateSession = asyncHandler(async (req, res) => {
 });
 
 export {
-  createSession,
+  // createSession,
   getUserSessions,
   getSessionById,
   updateSession

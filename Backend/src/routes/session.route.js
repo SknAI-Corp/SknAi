@@ -1,7 +1,7 @@
 import express from "express";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import {
-    createSession,
+    // createSession,
     getUserSessions,
     getSessionById,
     updateSession
@@ -10,7 +10,7 @@ import { upload } from "../middlewares/multer.middleware.js";
 
 const router = express.Router();
 
-router.route("/").post(verifyJWT, createSession)
+// router.route("/").post(verifyJWT, createSession)
 router.route("/").get(verifyJWT, getUserSessions)
 router.route("/:id").get(verifyJWT, getSessionById)
 router
