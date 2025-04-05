@@ -1,4 +1,4 @@
-// ✅ UPDATED ChatScreen.tsx
+
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Keyboard ,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -82,6 +83,7 @@ export default function ChatScreen() {
   };
 
   const handleSendMessage = async () => {
+    Keyboard.dismiss(); 
     if (!message && !selectedImage) return;
     const accessToken = await AsyncStorage.getItem("accessToken");
 
@@ -232,20 +234,7 @@ const pickImage = async () => {
     });
   }
 };
-// Function to take a photo
-// const takePhoto = async () => {
-//   let result = await ImagePicker.launchCameraAsync({
-//     mediaTypes: ImagePicker.MediaTypeOptions.Images,
-//     allowsEditing: true,
-//     aspect: [4, 3],
-//     quality: 1,
-//   });
 
-//   if (!result.canceled) {
-//     setImageUri(result.assets[0].uri);
-//     setModalVisible(false);
-//   }
-// };
 const handleCancelImage = () => {
   setSelectedImage(null); // Reset selected image
 };
