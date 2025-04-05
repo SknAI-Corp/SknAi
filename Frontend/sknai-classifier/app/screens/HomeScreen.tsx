@@ -100,7 +100,9 @@ useEffect(() => {
           <ActivityIndicator size="large" color="#000" />
         ) : sessions.length > 0 ? (
           sessions?.map((session, index) => (
-            <TouchableOpacity key={session?._id || index} style={styles.chatItem} >
+            <TouchableOpacity key={session?._id || index} style={styles.chatItem} onPress={() =>
+              router.push({ pathname: "/screens/ChatScreen", params: { sessionId: session._id } })
+            } >
               <Text style={styles.chatText}>{session?.title || "Unnamed Session"}</Text>
             </TouchableOpacity>
           ))

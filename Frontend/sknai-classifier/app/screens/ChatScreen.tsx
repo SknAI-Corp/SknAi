@@ -1,3 +1,4 @@
+// ✅ UPDATED ChatScreen.tsx
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -20,7 +21,7 @@ import { Camera } from "expo-camera";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_BASE_URL = "http://172.20.10.3:8000"; // Update this as needed
+const API_BASE_URL = "http://172.20.10.3:8000";
 
 type Message = {
   id?: string;
@@ -31,133 +32,117 @@ type Message = {
 };
 
 export default function ChatScreen() {
-  // const { SessionId } = useLocalSearchParams();
+  const { sessionId: routeSessionId } = useLocalSearchParams();
   const router = useRouter();
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [permission, setPermission] = useState<boolean | null>(null);
-  const openModal = () => setModalVisible(true);
-  const closeModal = () => setModalVisible(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  // const [sessionId, setSessionId] = useState("");
-  const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [typingMessage, setTypingMessage] = useState("");
-  const slideAnim = useRef(new Animated.Value(300)).current;
+  const [message, setMessage] = useState("");
   const [selectedImage, setSelectedImage] = useState<null | {
     uri: string;
     name: string;
     type: string;
   }>(null);
+  const [typingMessage, setTypingMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [permission, setPermission] = useState<boolean | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const flatListRef = useRef<FlatList<Message>>(null);
+  const slideAnim = useRef(new Animated.Value(300)).current;
 
-  const flatListRef = useRef<FlatList<Message>>(null); // Ref for FlatList
-  const typingScrollRef = useRef<ScrollView>(null);
-  const [thinking, setThinking] = useState(false);
-  const [showThinkingDots, setShowThinkingDots] = useState(true);
+  useEffect(() => {
+    if (routeSessionId) {
+      const id = routeSessionId as string;
+      console.log(id);
+      setSessionId(id);
+      fetchMessages(id);
+      setIsChatOpen(true); // <-- ensure chat is visible
+    }
+  }, [routeSessionId]);
 
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  useEffect(() => {
+    flatListRef.current?.scrollToEnd({ animated: true });
+  }, [chatMessages, typingMessage]);
+
+  const fetchMessages = async (id: string) => {
+    const accessToken = await AsyncStorage.getItem("accessToken");
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/v1/messages?sessionId=${id}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const messages = response.data.data;
+      console.log(messages);
+      setChatMessages(messages);
+      setIsChatOpen(true);
+    } catch (error) {
+      console.error("Error fetching session messages:", error);
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!message && !selectedImage) return;
-
-    setLoading(true);
-
     const accessToken = await AsyncStorage.getItem("accessToken");
 
+    const userMsgObj: Message = {
+      sender: "user",
+      content: message,
+      imageAttached: selectedImage?.uri || null,
+    };
+    setChatMessages((prev) => [...prev, userMsgObj]);
+    setMessage("");
+    setSelectedImage(null);
+    setLoading(true);
+
+    const thinkingMsgObj: Message = {
+      id: Date.now().toString(),
+      sender: "ai",
+      content: "thinking...",
+      imageAttached: null,
+      temp: true,
+    };
+    setChatMessages((prev) => [...prev, thinkingMsgObj]);
+
     try {
-      // new code
       const formData = new FormData();
-
       if (sessionId) formData.append("sessionId", sessionId);
-
       if (message) formData.append("content", message);
       if (selectedImage) {
         formData.append("imageAttached", {
           uri: selectedImage.uri,
           name: selectedImage.name,
           type: selectedImage.type,
-        } as any); // 'any' to fix TS error
-      }
-      // till here
-      console.log(formData);
-
-      const response = await axios.post(
-        `${API_BASE_URL}/api/v1/messages/`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      const {
-        sessionId: returnedSessionId,
-        userMessage,
-        aiMessage,
-        sessionTitle,
-      } = response.data.data;
-
-      if (!sessionId) {
-        setSessionId(returnedSessionId);
+        } as any);
       }
 
-      // Append user message immediately
-      const userMsgObj = {
-        sender: "user",
-        content: userMessage.content,
-        imageAttached: userMessage.imageAttached || null,
-      } as Message;
-      setChatMessages((prev) => [...prev, userMsgObj]);
-      setMessage("");
-      setSelectedImage(null);
+      const response = await axios.post(`${API_BASE_URL}/api/v1/messages/`, formData, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
-      const thinkingMsgObj: Message = {
-        id: Date.now().toString(),
-        sender: "ai",
-        content: "thinking...", // placeholder
-        imageAttached: null,
-        temp: true, // custom flag to identify temporary message
-      };
-
-      setChatMessages((prev) => [...prev, thinkingMsgObj]);
-
-      // Start blinking dots
-      setThinking(true);
-      const blinkInterval = setInterval(() => {
-        setShowThinkingDots((prev) => !prev);
-      }, 500);
-
-      // Remove "thinking..." temporary message
+      const { sessionId: returnedSessionId, aiMessage } = response.data.data;
+      if (!sessionId) setSessionId(returnedSessionId);
       setChatMessages((prev) => prev.filter((msg) => !msg.temp));
 
-      // Stop blinking
-      clearInterval(blinkInterval);
-      setThinking(false);
-
-      // Start typing animation
       let aiContent = "";
       setTypingMessage("");
-
       for (let i = 0; i < aiMessage.content.length; i++) {
         setTimeout(() => {
           aiContent += aiMessage.content[i];
           setTypingMessage(aiContent);
-        }, i * 50);
+        }, i * 30);
       }
 
-      // After animation complete, add AI message
       setTimeout(() => {
-        const aiMsgObj = {
-          sender: "ai",
-          content: aiMessage.content,
-        } as Message;
-        setChatMessages((prev) => [...prev, aiMsgObj]);
+        setChatMessages((prev) => [
+          ...prev,
+          { sender: "ai", content: aiMessage.content, imageAttached: null },
+        ]);
         setTypingMessage("");
-      }, aiMessage.content.length * 50 + 100);
+      }, aiMessage.content.length * 30 + 200);
     } catch (error) {
       console.error("Error sending message:", error);
     } finally {
@@ -165,90 +150,55 @@ export default function ChatScreen() {
     }
   };
 
-  useEffect(() => {
-    if (typingScrollRef.current) {
-      typingScrollRef.current.scrollToEnd({ animated: true });
-    }
-  }, [typingMessage]);
+  const openModal = () => setModalVisible(true);
+  const closeModal = () => setModalVisible(false);
+  const setImageUri = () => {};
+  // const handleCancelImage = () => setSelectedImage(null);
 
-  const openChat = async () => {
+  const openChat = () => {
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: 300,
       useNativeDriver: true,
     }).start();
+  
+    if (!routeSessionId) {
+      setSessionId(null);
+      setChatMessages([]);
+    }
+  
     setIsChatOpen(true);
-    setSessionId(null);
-    setChatMessages([]);
-    // const accessToken = await AsyncStorage.getItem("accessToken");
-
-    // try {
-    //   const response = await axios.post(
-    //     `${API_BASE_URL}/api/v1/session/`,
-    //     {},
-    //     { headers: { Authorization: `Bearer ${accessToken}` } }
-    //   );
-    //   setSessionId(response.data.data._id);
-    //   console.log(response.data.data._id);
-    // } catch (error) {
-    //   console.error("Error creating new session", error);
-    // }
   };
 
-  const closeChat = () => {
-    Animated.timing(slideAnim, {
-      toValue: 300,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => setIsChatOpen(false));
-  };
-
-  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
-    const isLast = index === chatMessages.length - 1;
-    const showImage = item.sender === "user" && item.imageAttached;
-    const isMostRecentUserMessage =
-      item.sender === "user" && item.content === message;
-
-    return (
+  const renderMessage = ({ item }: { item: Message }) => (
+    <View
+      style={[
+        styles.messageContainer,
+        item.sender === "user"
+          ? styles.userMessageContainer
+          : styles.aiMessageContainer,
+      ]}
+    >
       <View
         style={[
-          styles.messageContainer,
+          styles.messageBubble,
           item.sender === "user"
-            ? styles.userMessageContainer
-            : styles.aiMessageContainer,
+            ? { backgroundColor: "#E9B08A" }
+            : styles.aiMessage,
         ]}
       >
-        <View
-          style={[
-            styles.messageBubble,
-            // User message background
-            item.sender === "user" && { backgroundColor: "#E9B08A" },
-
-            // AI message: no background if image attached
-            item.sender === "ai" &&
-              (item.imageAttached
-                ? { backgroundColor: "transparent" }
-                : styles.aiMessage),
-          ]}
-        >
-          {/* Render Text if exists */}
-          {item.content ? (
-            <Text style={styles.messageText}>{item.content}</Text>
-          ) : null}
-
-          {/* Render Image if exists */}
-          {item.imageAttached ? (
-            <Image
-              source={{ uri: item.imageAttached }}
-              style={styles.imagePreview} // Define style for image size
-              resizeMode="cover"
-            />
-          ) : null}
-        </View>
+        {item.content && <Text style={styles.messageText}>{item.content}</Text>}
+        {item.imageAttached && (
+          <Image
+            source={{ uri: item.imageAttached }}
+            style={styles.imagePreview}
+            resizeMode="cover"
+          />
+        )}
       </View>
-    );
-  };
-  // Request camera permission
+    </View>
+  );
+
   useEffect(() => {
     (async () => {
       const { status } = await Camera.requestCameraPermissionsAsync();
@@ -258,56 +208,53 @@ export default function ChatScreen() {
 
   if (permission === null) return <Text>Requesting camera permissions...</Text>;
   if (permission === false) return <Text>No access to camera</Text>;
+// Function to pick image from gallery
+const pickImage = async () => {
+  let result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: true,
+    aspect: [4, 3],
+    quality: 1,
+  });
 
-  // Function to pick image from gallery
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
+  if (!result.canceled && result.assets.length > 0) {
+    const pickedAsset = result.assets[0];
+    const localUri = pickedAsset.uri;
+    const fileName = localUri.split("/").pop() || `photo.jpg`;
+    const fileType = pickedAsset.type
+      ? `${pickedAsset.type}/jpeg`
+      : "image/jpeg";
+    setModalVisible(false);
+    setSelectedImage({
+      uri: localUri,
+      name: fileName,
+      type: fileType,
     });
+  }
+};
+// Function to take a photo
+// const takePhoto = async () => {
+//   let result = await ImagePicker.launchCameraAsync({
+//     mediaTypes: ImagePicker.MediaTypeOptions.Images,
+//     allowsEditing: true,
+//     aspect: [4, 3],
+//     quality: 1,
+//   });
 
-    if (!result.canceled && result.assets.length > 0) {
-      const pickedAsset = result.assets[0];
-      const localUri = pickedAsset.uri;
-      const fileName = localUri.split("/").pop() || `photo.jpg`;
-      const fileType = pickedAsset.type
-        ? `${pickedAsset.type}/jpeg`
-        : "image/jpeg";
-      setModalVisible(false);
-      setSelectedImage({
-        uri: localUri,
-        name: fileName,
-        type: fileType,
-      });
-    }
-  };
-  // Function to take a photo
-  const takePhoto = async () => {
-    let result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
-      setModalVisible(false);
-    }
-  };
-  const handleCancelImage = () => {
-    setSelectedImage(null); // Reset selected image
-  };
-
+//   if (!result.canceled) {
+//     setImageUri(result.assets[0].uri);
+//     setModalVisible(false);
+//   }
+// };
+const handleCancelImage = () => {
+  setSelectedImage(null); // Reset selected image
+};
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={{ flex: 1 }}
     >
       <View style={styles.container}>
-        {/* Header Section */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -315,7 +262,7 @@ export default function ChatScreen() {
           >
             <Ionicons name="arrow-back" size={24} color="black" />
           </TouchableOpacity>
-          <Text style={styles.title}>NewChat</Text>
+          <Text style={styles.title}>{routeSessionId ? "Chat" : "New Chat"}</Text>
         </View>
 
         {!isChatOpen && (
@@ -336,39 +283,18 @@ export default function ChatScreen() {
             />
 
             {typingMessage.length > 0 && (
-              <View
-                style={[styles.messageContainer, styles.aiMessageContainer]}
-              >
+              <View style={[styles.messageContainer, styles.aiMessageContainer]}>
                 <View style={[styles.messageBubble, styles.aiMessage]}>
-                  <ScrollView
-                    ref={typingScrollRef}
-                    style={[
-                      styles.typingScrollView,
-                      {
-                        maxHeight: Math.min(
-                          50 + typingMessage.length * 0.8,
-                          300
-                        ), // Cap at 300
-                      },
-                    ]}
-                    nestedScrollEnabled={true}
-                    showsVerticalScrollIndicator={true}
-                  >
-                    <Text style={styles.messageText}>{typingMessage}</Text>
-                  </ScrollView>
+                  <Text style={styles.messageText}>{typingMessage}</Text>
                 </View>
               </View>
             )}
 
             <View style={styles.chatBox}>
-              {/* Icon Button to open modal */}
               <TouchableOpacity style={styles.iconButton} onPress={openModal}>
                 <Ionicons name="add" size={24} color="black" />
               </TouchableOpacity>
-
-              {/* Image and TextInput Container */}
               <View style={styles.inputWrapper}>
-                {/* Display selected image */}
                 {selectedImage && (
                   <View style={styles.imageContainer}>
                     <TouchableOpacity
@@ -383,7 +309,6 @@ export default function ChatScreen() {
                     />
                   </View>
                 )}
-
                 <TextInput
                   style={styles.input}
                   placeholder="Type a message..."
@@ -392,8 +317,6 @@ export default function ChatScreen() {
                   placeholderTextColor="#555"
                 />
               </View>
-
-              {/* Send Button */}
               <TouchableOpacity
                 style={styles.sendButton}
                 onPress={handleSendMessage}
@@ -404,9 +327,7 @@ export default function ChatScreen() {
             </View>
           </>
         )}
-        {/* Disclaimer */}
-        {/* <Text style={styles.disclaimer}>SknAI can make mistakes. Check important info.</Text> */}
-        {/* Modal for Image Upload / Scan Photo */}
+
         <Modal visible={modalVisible} transparent animationType="slide">
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
@@ -432,32 +353,7 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-    padding: 20,
-  },
-  inputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingLeft: 10,
-    flex: 1,
-    height: 40,
-  },
-  imageContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  cancelButton: {
-    marginRight: 5,
-  },
-  selectedImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 10,
-    marginRight: 10,
-  },
+  container: { flex: 1, backgroundColor: "#fff", padding: 20 },
   header: {
     position: "absolute",
     top: 0,
@@ -500,10 +396,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 5,
   },
-  newChatText: {
-    fontSize: 16,
-    marginRight: 5,
-  },
+  newChatText: { fontSize: 16, marginRight: 5 },
   chatBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -511,52 +404,27 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "#E9B08A",
   },
-  input: {
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingLeft: 10,
     flex: 1,
-    marginHorizontal: 10,
-    fontSize: 16,
+    height: 40,
   },
-  sendButton: {
-    padding: 10,
-  },
-  messageContainer: {
-    marginVertical: 5,
-    maxWidth: "100%",
-  },
-  userMessageContainer: {
-    alignSelf: "flex-end",
-  },
-  aiMessageContainer: {
-    alignSelf: "flex-start",
-    width: "100%",
-  },
-  messageBubble: {
-    padding: 10,
-    borderRadius: 10,
-  },
-  userMessage: {
-    backgroundColor: "#E9B08A",
-    marginTop: 10,
-    padding: 5,
-    borderRadius: 10,
-  },
-  aiMessage: {
-    // backgroundColor: "#d3d3d3",
-    marginTop: 10,
-  },
-  messageText: {
-    color: "#000",
-  },
-  disclaimer: {
-    fontSize: 10,
-    color: "gray",
-    position: "absolute",
-    bottom: 10,
-    textAlign: "center",
-  },
-  iconButton: {
-    padding: 5,
-  },
+  input: { flex: 1, marginHorizontal: 10, fontSize: 16 },
+  sendButton: { padding: 10 },
+  messageContainer: { marginVertical: 5, maxWidth: "100%" },
+  userMessageContainer: { alignSelf: "flex-end" },
+  aiMessageContainer: { alignSelf: "flex-start", width: "100%" },
+  messageBubble: { padding: 10, borderRadius: 10 },
+  userMessage: { backgroundColor: "#E9B08A" },
+  aiMessage: { backgroundColor: "white" },
+  messageText: { color: "#000" },
+  imageContainer: { flexDirection: "row", alignItems: "center", marginRight: 10 },
+  cancelButton: { marginRight: 5 },
+  selectedImage: { width: 50, height: 50, borderRadius: 10, marginRight: 10 },
+  imagePreview: { width: 120, height: 120, marginTop: 10, borderRadius: 10 },
+  iconButton: { padding: 5 },
   modalContainer: {
     flex: 1,
     justifyContent: "center",
@@ -570,11 +438,7 @@ const styles = StyleSheet.create({
     width: "80%",
     alignItems: "center",
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 15,
-  },
+  modalTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 15 },
   modalButton: {
     backgroundColor: "#E9B08A",
     padding: 10,
@@ -583,20 +447,6 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
   },
-  modalText: {
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  closeModalButton: {
-    marginTop: 10,
-  },
-  imagePreview: {
-    width: 120,
-    height: 120,
-    marginTop: 10,
-    borderRadius: 10,
-  },
-  typingScrollView: {
-    maxHeight: 150, // Or any height limit you prefer
-  },
+  modalText: { fontSize: 16, fontWeight: "bold" },
+  closeModalButton: { marginTop: 10 },
 });
