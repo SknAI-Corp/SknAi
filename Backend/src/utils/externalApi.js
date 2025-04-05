@@ -14,7 +14,7 @@ export const callClassifierAPI = async (imageUrl) => {
 
 export const callQnAAPI = async ({ user_message, predicted_disease, session_id }) => {
   try {
-    const res = await axios.post("http://127.0.0.1:8082/chat", {
+    const res = await axios.post("http://127.0.0.1:8081/chat", {
       user_message,
       user_id:"123456", //TODO: SHould be removed
       predicted_disease,

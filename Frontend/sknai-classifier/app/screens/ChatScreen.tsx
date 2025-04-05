@@ -19,10 +19,8 @@ import axios from "axios";
 import { Camera } from "expo-camera";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import uuid from 'react-native-uuid';
 
 const API_BASE_URL = "http://172.20.10.3:8000"; // Update this as needed
-const id = uuid.v4().toString();
 
 type Message = {
   id?: string;
@@ -41,7 +39,7 @@ export default function ChatScreen() {
   const openModal = () => setModalVisible(true);
   const closeModal = () => setModalVisible(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [sessionId, setSessionId] = useState("");
+  // const [sessionId, setSessionId] = useState("");
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
@@ -59,6 +57,8 @@ export default function ChatScreen() {
   const [thinking, setThinking] = useState(false);
   const [showThinkingDots, setShowThinkingDots] = useState(true);
 
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
   const handleSendMessage = async () => {
     if (!message && !selectedImage) return;
 
@@ -69,7 +69,9 @@ export default function ChatScreen() {
     try {
       // new code
       const formData = new FormData();
-      formData.append("sessionId", sessionId);
+
+      if (sessionId) formData.append("sessionId", sessionId);
+
       if (message) formData.append("content", message);
       if (selectedImage) {
         formData.append("imageAttached", {
@@ -92,8 +94,17 @@ export default function ChatScreen() {
         }
       );
 
-      const { userMessage, aiMessage } = response.data.data;
-      
+      const {
+        sessionId: returnedSessionId,
+        userMessage,
+        aiMessage,
+        sessionTitle,
+      } = response.data.data;
+
+      if (!sessionId) {
+        setSessionId(returnedSessionId);
+      }
+
       // Append user message immediately
       const userMsgObj = {
         sender: "user",
@@ -114,18 +125,18 @@ export default function ChatScreen() {
 
       setChatMessages((prev) => [...prev, thinkingMsgObj]);
 
-// Start blinking dots
-setThinking(true);
-const blinkInterval = setInterval(() => {
-  setShowThinkingDots((prev) => !prev);
-}, 500);
+      // Start blinking dots
+      setThinking(true);
+      const blinkInterval = setInterval(() => {
+        setShowThinkingDots((prev) => !prev);
+      }, 500);
 
-// Remove "thinking..." temporary message
-setChatMessages((prev) => prev.filter((msg) => !msg.temp));
+      // Remove "thinking..." temporary message
+      setChatMessages((prev) => prev.filter((msg) => !msg.temp));
 
-// Stop blinking
-clearInterval(blinkInterval);
-setThinking(false);
+      // Stop blinking
+      clearInterval(blinkInterval);
+      setThinking(false);
 
       // Start typing animation
       let aiContent = "";
@@ -146,10 +157,7 @@ setThinking(false);
         } as Message;
         setChatMessages((prev) => [...prev, aiMsgObj]);
         setTypingMessage("");
-        
       }, aiMessage.content.length * 50 + 100);
-
-      
     } catch (error) {
       console.error("Error sending message:", error);
     } finally {
@@ -170,19 +178,21 @@ setThinking(false);
       useNativeDriver: true,
     }).start();
     setIsChatOpen(true);
-    const accessToken = await AsyncStorage.getItem("accessToken");
+    setSessionId(null);
+    setChatMessages([]);
+    // const accessToken = await AsyncStorage.getItem("accessToken");
 
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/api/v1/session/`,
-        {},
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      setSessionId(response.data.data._id);
-      console.log(response.data.data._id);
-    } catch (error) {
-      console.error("Error creating new session", error);
-    }
+    // try {
+    //   const response = await axios.post(
+    //     `${API_BASE_URL}/api/v1/session/`,
+    //     {},
+    //     { headers: { Authorization: `Bearer ${accessToken}` } }
+    //   );
+    //   setSessionId(response.data.data._id);
+    //   console.log(response.data.data._id);
+    // } catch (error) {
+    //   console.error("Error creating new session", error);
+    // }
   };
 
   const closeChat = () => {
@@ -193,7 +203,7 @@ setThinking(false);
     }).start(() => setIsChatOpen(false));
   };
 
-  const renderMessage = ({ item, index }: { item: Message; index:number }) => {
+  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     const isLast = index === chatMessages.length - 1;
     const showImage = item.sender === "user" && item.imageAttached;
     const isMostRecentUserMessage =
@@ -212,14 +222,14 @@ setThinking(false);
           style={[
             styles.messageBubble,
             // User message background
-      item.sender === "user" && { backgroundColor: "#E9B08A" },
+            item.sender === "user" && { backgroundColor: "#E9B08A" },
 
-      // AI message: no background if image attached
-      item.sender === "ai" &&
-        (item.imageAttached
-          ? { backgroundColor: "transparent" }
-          : styles.aiMessage),
-    ]}
+            // AI message: no background if image attached
+            item.sender === "ai" &&
+              (item.imageAttached
+                ? { backgroundColor: "transparent" }
+                : styles.aiMessage),
+          ]}
         >
           {/* Render Text if exists */}
           {item.content ? (
@@ -234,15 +244,6 @@ setThinking(false);
               resizeMode="cover"
             />
           ) : null}
-
-          {/* Show "Thinking..." only for the last AI message and while thinking */}
-          {item.sender === 'ai' && item.content === 'thinking...' && thinking ? (
-  <Text style={{ color: '#555', fontStyle: 'italic' }}>
-    {showThinkingDots ? 'Thinking...' : ''}
-  </Text>
-) : (
-  <Text style={styles.messageText}>{item.content}</Text>
-)}
         </View>
       </View>
     );
@@ -335,19 +336,25 @@ setThinking(false);
             />
 
             {typingMessage.length > 0 && (
-              <View style={[styles.messageContainer, styles.aiMessageContainer]}>
+              <View
+                style={[styles.messageContainer, styles.aiMessageContainer]}
+              >
                 <View style={[styles.messageBubble, styles.aiMessage]}>
                   <ScrollView
-                  ref={typingScrollRef}
-                    style={[styles.typingScrollView, {
-                      maxHeight: Math.min(50 + typingMessage.length * 0.8, 300), // Cap at 300
-                    },]}
+                    ref={typingScrollRef}
+                    style={[
+                      styles.typingScrollView,
+                      {
+                        maxHeight: Math.min(
+                          50 + typingMessage.length * 0.8,
+                          300
+                        ), // Cap at 300
+                      },
+                    ]}
                     nestedScrollEnabled={true}
                     showsVerticalScrollIndicator={true}
                   >
-                    <Text style={styles.messageText}>
-                      {typingMessage}
-                    </Text>
+                    <Text style={styles.messageText}>{typingMessage}</Text>
                   </ScrollView>
                 </View>
               </View>
@@ -530,7 +537,7 @@ const styles = StyleSheet.create({
   userMessage: {
     backgroundColor: "#E9B08A",
     marginTop: 10,
-    padding:5,
+    padding: 5,
     borderRadius: 10,
   },
   aiMessage: {
