@@ -50,10 +50,24 @@ const getSessionById = asyncHandler(async (req, res) => {
     throw new ApiError(403, "You are not authorized to access this session");
   }
 
-  return res
-    .status(200)
-    .json(new ApiResponse("Session fetched successfully", session, 200));
+  // 👉 Eligibility check
+  const [messages, existingReport] = await Promise.all([
+    Message.find({ sessionId: id }),
+    Report.exists({ sessionId: id })
+  ]);
+
+  const hasImage = messages.some(msg => msg.imageAttached);
+  const hasAI = messages.some(msg => msg.sender === "ai");
+  const canVerifyWithDoctor = hasImage && hasAI && !existingReport;
+
+  return res.status(200).json(
+    new ApiResponse("Session fetched successfully", {
+      ...session.toObject(),
+      canVerifyWithDoctor
+    }, 200)
+  );
 });
+
 
 // Update an existing session (title, imageUrl, medicalHistory)
 const updateSession = asyncHandler(async (req, res) => {
