@@ -7,6 +7,8 @@ import { Message } from "../models/message.model.js";
 import { Report } from "../models/report.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { callQnAAPI } from "../utils/externalApi.js";
+import { generateAndUploadPDF } from "../utils/pdfUploader.js";
+import { User } from "../models/user.model.js";
 
 // POST /api/v1/reports/verify
 const verifyWithDermatologist = asyncHandler(async (req, res) => {
@@ -61,10 +63,44 @@ const verifyWithDermatologist = asyncHandler(async (req, res) => {
     userQuery,
     aiGeneratedSummary: aiResponse.response
   });
-
+  
+  // Generate PDF and upload to Cloudinary
+  const user = await User.findById(req.user._id);
+  const pdfUrl = await generateAndUploadPDF({
+    userName: user.name,
+    userEmail: user.email,
+    aiReportText: aiResponse.response,
+    imageUrls: uploadedImages,
+    sessionId
+  });
+  
+  // Save PDF URL to the same report
+  report.reportPdfUrl = pdfUrl;
+  await report.save();
+  
   return res.status(201).json(
     new ApiResponse("Report submitted to dermatologist", report, 201)
   );
 });
 
-export { verifyWithDermatologist };
+
+// GET /api/v1/reports?userId=xyz
+const getReports = asyncHandler(async (req, res) => {
+    const userId = req.query.userId;
+  
+    if (!userId) {
+      throw new ApiError(400, "userId is required");
+    }
+  
+    const reports = await Report.find({ userId }).sort({ createdAt: -1 });
+  
+    return res.status(200).json(
+      new ApiResponse("Reports fetched successfully", reports, 200)
+    );
+  });
+  
+export {
+    verifyWithDermatologist,
+    getReports
+};
+

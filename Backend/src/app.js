@@ -16,7 +16,7 @@ app.use(cookieParser());
 import userRouter from './routes/user.route.js'
 import sessionRouter from './routes/session.route.js'
 import messageRoutes from "./routes/message.route.js";
-import reportRoutes from "./routes/report.routes.js";
+import reportRoutes from "./routes/report.route.js";
 
 app.use("/api/v1/users", userRouter)
 app.use("/api/v1/session", sessionRouter)

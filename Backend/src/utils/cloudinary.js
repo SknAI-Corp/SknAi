@@ -22,19 +22,4 @@ const uploadOnCloudinary = async (localfilePath) => {
     }
 }
 
-const uploadPdfToCloudinary = async (localfilePath) => {
-    try {
-        if (!localfilePath) return null;
-        const response = await cloudinary.uploader.upload(localfilePath, {
-            resource_type: 'raw', // use 'raw' for PDF
-        });
-        console.log("PDF uploaded successfully", response.url);
-        fs.unlinkSync(localfilePath); // Delete local file after upload
-        return response;
-    } catch (error) {
-        fs.unlinkSync(localfilePath);
-        return null;
-    }
-}
-
-export {uploadOnCloudinary, uploadPdfToCloudinary}
+export {uploadOnCloudinary}
