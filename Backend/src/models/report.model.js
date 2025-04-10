@@ -34,6 +34,10 @@ const reportSchema = new Schema(
       enum: ["pending", "done"],
       default: "pending"
     },
+    doctorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Doctor"
+    },
     submittedAt: {
       type: Date,
       default: Date.now

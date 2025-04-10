@@ -67,7 +67,7 @@ const verifyWithDermatologist = asyncHandler(async (req, res) => {
   // Generate PDF and upload to Cloudinary
   const user = await User.findById(req.user._id);
   const pdfUrl = await generateAndUploadPDF({
-    userName: user.name,
+    userName: user.firstName,
     userEmail: user.email,
     aiReportText: aiResponse.response,
     imageUrls: uploadedImages,

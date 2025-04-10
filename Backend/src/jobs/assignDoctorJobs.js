@@ -1,16 +1,19 @@
-// jobs/assignDoctorJob.js
 import { Report } from "../models/report.model.js";
 import { Doctor } from "../models/doctor.model.js";
 
-// Assigns unassigned reports to the best doctor
-export const assignDoctorsToPendingReports = async () => {
+export const assignDoctorsToPendingReports = async (mode = "cron") => {
   try {
     const unassignedReports = await Report.find({
       status: "pending",
-      assignedDoctor: { $exists: false }
+      doctorId: { $exists: false }
     });
 
-    if (!unassignedReports.length) return;
+    if (!unassignedReports.length) {
+      console.log(`✅ No unassigned reports found. [${mode}]`);
+      return [];
+    }
+
+    const assigned = [];
 
     for (const report of unassignedReports) {
       const doctors = await Doctor.aggregate([
@@ -18,7 +21,7 @@ export const assignDoctorsToPendingReports = async () => {
           $lookup: {
             from: "reports",
             localField: "_id",
-            foreignField: "assignedDoctor",
+            foreignField: "doctorId",
             as: "assignedReports"
           }
         },
@@ -34,7 +37,7 @@ export const assignDoctorsToPendingReports = async () => {
               }
             },
             performanceScore: {
-              $subtract: [100, "$activeReports"] // Simple logic: fewer pending reports = higher priority
+              $subtract: [100, "$activeReports"]
             }
           }
         },
@@ -44,16 +47,21 @@ export const assignDoctorsToPendingReports = async () => {
       if (!doctors.length) continue;
 
       const bestDoctor = doctors[0];
-      report.assignedDoctor = bestDoctor._id;
+      report.doctorId = bestDoctor._id;
       await report.save();
 
-      await Doctor.findByIdAndUpdate(bestDoctor._id, {
-        $inc: { currentlyAssigned: 1 }
+      assigned.push({
+        reportId: report._id,
+        assignedTo: bestDoctor.name,
+        doctorId: bestDoctor._id
       });
 
-      console.log(`✅ Assigned report ${report._id} to Dr. ${bestDoctor.name}`);
+      console.log(`📋 Assigned report ${report._id} to Dr. ${bestDoctor.name} [${mode}]`);
     }
+
+    return assigned;
   } catch (err) {
-    console.error("❌ Doctor assignment failed:", err);
+    console.error(`❌ Report assignment failed. [${mode}]`, err.message);
+    return [];
   }
 };

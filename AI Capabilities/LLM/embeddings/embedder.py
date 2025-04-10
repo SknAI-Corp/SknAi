@@ -3,8 +3,8 @@
 import torch
 import numpy as np
 from typing import List
-from langchain.embeddings.base import Embeddings
 from embeddings.model_loader import load_biobert_model
+from langchain_core.embeddings import Embeddings
 
 # Cache model to avoid reloading
 tokenizer, model = load_biobert_model()
@@ -28,13 +28,10 @@ def embed_text(text: str) -> List[float]:
     norm = np.linalg.norm(cls_embedding)
     return (cls_embedding / norm).tolist() if norm > 0 else cls_embedding.tolist()
 
-class BioBERTEmbeddings(Embeddings):
-    """
-    LangChain-compatible embedding wrapper for BioBERT.
-    """
 
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+class BioBERTEmbedding(Embeddings):
+    def embed_documents(self, texts):
         return [embed_text(text) for text in texts]
 
-    def embed_query(self, text: str) -> List[float]:
+    def embed_query(self, text):
         return embed_text(text)

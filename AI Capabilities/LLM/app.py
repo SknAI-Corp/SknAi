@@ -19,7 +19,8 @@ from langchain.memory import ConversationSummaryBufferMemory
 from langchain.memory.chat_message_histories import RedisChatMessageHistory
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_community.vectorstores import Pinecone
+from langchain_pinecone import PineconeVectorStore
+
 from langchain_core.runnables import RunnableLambda
 
 # Custom modules
@@ -54,7 +55,9 @@ log_collection = mongo_db[COLLECTION_NAME]
 # Load embedding model and vector store
 tokenizer, model = load_biobert_model()
 pinecone_index = initialize_pinecone()
-vector_store = Pinecone(index=pinecone_index, embedding=embed_text, text_key="text")
+from embeddings.embedder import BioBERTEmbedding
+vector_store = PineconeVectorStore(index=pinecone_index, embedding=BioBERTEmbedding(), text_key="text")
+
 
 # ---------------------- Models ---------------------- #
 class ChatRequest(BaseModel):
