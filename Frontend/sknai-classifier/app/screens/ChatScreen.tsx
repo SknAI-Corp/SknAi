@@ -187,12 +187,12 @@ export default function ChatScreen() {
     const accessToken = await AsyncStorage.getItem("accessToken");
     setLoading(true);
     setError(null);
+    // console.log(accessToken);
 
     // Prepare the form data to send to the backend
     const formData = new FormData();
     formData.append("sessionId", sessionId);
     formData.append("userQuery", inputText);
-    console.log(formData);
 
     // Append images to the form data
     try {
@@ -215,20 +215,24 @@ export default function ChatScreen() {
       for (let pair of formData.entries()) {
         console.log(pair[0] + ": " + pair[1]);
       }
-      const response = await fetch(`${API_BASE_URL}/api/v1/reports/verify`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`, // Add authentication token if needed
-        },
-        body: formData,
-      });
+      console.log(formData);
+      const response = await axios.post(
+        `${API_BASE_URL}/api/v1/reports/verify`,
+        formData,  // This is the body (no need for { method: "POST" })
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'multipart/form-data',  // Important to set for image upload
+          }
+        }
+      );
       console.log(response);
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || "Failed to submit the report");
+      if (!response) {
+        const data = await response;
+        throw new Error(data || "Failed to submit the report");
       }
 
-      const data = await response.json();
+      const data = await response.data;
       alert(data.message); // Success message from API response
       // Optionally, reset the form here
     } catch (err) {

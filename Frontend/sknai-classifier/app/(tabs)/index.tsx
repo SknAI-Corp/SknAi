@@ -21,9 +21,13 @@ const IndexScreen = () => {
   }, []);
   // useEffect(() => {
   //   const clearStorage = async () => {
+  //     const token = await AsyncStorage.getItem("accessToken");
   //     try {
   //       await AsyncStorage.clear();
   //       console.log('AsyncStorage cleared!');
+  //       if(!token){
+  //         router.replace("/screens/GetStarted");
+  //       }
         
   //     } catch (e) {
   //       console.error('Error clearing AsyncStorage:', e);

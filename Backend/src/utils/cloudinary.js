@@ -1,7 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
 
-<<<<<<< Updated upstream
 cloudinary.config({ 
   cloud_name: process.env.CLOUDINARY_NAME, 
   api_key: process.env.CLOUDINARY_KEY, 
@@ -45,35 +44,3 @@ const uploadBufferToCloudinary = (buffer, sessionId) => {
 };
 
 export { uploadOnCloudinary, uploadBufferToCloudinary };
-=======
-// Cloudinary configuration
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_NAME,
-  api_key: process.env.CLOUDINARY_KEY,
-  api_secret: process.env.CLOUDINARY_SECRET
-});
-
-// Upload function
-const uploadOnCloudinary = async (localfilePath) => {
-  try {
-    if (!localfilePath) {
-      throw new Error("No file path provided");
-    }
-
-    console.log("Uploading file to Cloudinary:", localfilePath);  // Debugging log
-    const response = await cloudinary.uploader.upload(localfilePath, {
-      resource_type: 'auto',  // This handles all file types
-    });
-
-    console.log("File has been successfully uploaded to Cloudinary:", response.url);  // Debugging log
-    fs.unlinkSync(localfilePath);  // Clean up the file after upload
-    return response;
-  } catch (error) {
-    console.error("Cloudinary upload failed:", error);  // Log the error to troubleshoot
-    fs.unlinkSync(localfilePath);  // Clean up the file if upload fails
-    return null;
-  }
-};
-
-export { uploadOnCloudinary };
->>>>>>> Stashed changes
