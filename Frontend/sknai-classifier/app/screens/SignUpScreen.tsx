@@ -11,6 +11,7 @@ import { useRouter } from "expo-router";
 // import { GoogleAuthProvider } from "firebase/auth";
 import { AntDesign, FontAwesome } from "@expo/vector-icons";
 import axios from "axios";
+import { API_BASE_URL } from "./config";
 
 // WebBrowser.maybeCompleteAuthSession();
 const SignupScreen =  () => {
@@ -24,7 +25,7 @@ const SignupScreen =  () => {
 
   const handleSignup = async () => {
     try {
-      const response = await axios.post("http://172.20.10.3:8080/signup", {
+      const response = await axios.post(`${API_BASE_URL}/api/v1/users/register`, {
         firstName,
         lastName,
         email,

@@ -3,6 +3,7 @@ import { View, Text, Button, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
+import { API_BASE_URL } from './config';
 
 const LogoutScreen = () => {
   const router = useRouter();
@@ -14,7 +15,7 @@ const LogoutScreen = () => {
         throw new Error('Access token is missing');
       }
       // Make a request to the backend to clear cookies and logout user
-      await axios.post('http://172.20.10.3:8000/api/v1/users/logout', {}, {
+      await axios.post(`${API_BASE_URL}/api/v1/users/logout`, {}, {
         withCredentials: true, // Ensure cookies are sent with the request
         headers: {
           'Authorization': `Bearer ${accessToken}`, // Pass the valid token

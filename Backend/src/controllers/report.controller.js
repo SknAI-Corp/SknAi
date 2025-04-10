@@ -74,13 +74,24 @@ const verifyWithDermatologist = asyncHandler(async (req, res) => {
     sessionId
   });
 
+<<<<<<< Updated upstream
   // Save PDF URL to report
   report.reportPdfUrl = pdfUrl;
   await report.save();
 
+=======
+  console.log(pdfUrl);
+  
+  // Save PDF URL to the same report
+  report.reportPdfUrl = pdfUrl;
+  await report.save();
+
+  console.log(report);
+  
+>>>>>>> Stashed changes
   return res.status(201).json(
-    new ApiResponse("Report submitted to dermatologist", report, 201)
-  );
+    new ApiResponse("Report submitted to dermatologist", report, 201)
+  );
 });
 
 // GET /api/v1/reports?userId=xyz

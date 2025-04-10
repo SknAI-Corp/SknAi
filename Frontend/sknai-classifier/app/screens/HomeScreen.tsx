@@ -26,6 +26,9 @@ const HomeScreen = () => {
   const [token, setToken] = useState<string | null>(null);
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+   const [selectedImage, setSelectedImage] = useState<{ uri: string } | null>(
+      null
+    );
 
   
 useEffect(() => {
@@ -46,16 +49,43 @@ useEffect(() => {
   const fetchSessions = async () => {
     try {
       const accessToken = await AsyncStorage.getItem("accessToken");
-      const response = await axios.get(`${API_BASE_URL}/api/v1/session/`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      setSessions(response.data.data); // Assuming `data` contains sessions array
+     
+
+        const response = await axios.get(`${API_BASE_URL}/api/v1/session/`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        setSessions(response.data.data); // Assuming `data` contains sessions array
+      
     } catch (error) {
       console.error("Error fetching sessions:", error);
     } finally {
       setLoading(false);
     }
   };
+  const fetchUser = async () => {
+    try {
+      const accessToken = await AsyncStorage.getItem("accessToken");
+      const response = await axios.get(
+        `${API_BASE_URL}/api/v1/users/current-user`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+      // Wrap the string in an object with `uri`
+      const imageUrl = response.data.data.profileImage;
+      if (imageUrl) {
+        setSelectedImage({ uri: imageUrl });
+      } else {
+        console.warn("No profile image found in response.");
+      }
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchUser();
 
   fetchSessions();
 
@@ -89,7 +119,7 @@ useEffect(() => {
          <Text style={styles.menuText}><Image source={require("../../assets/images/home.png")}></Image>Home</Text>
           
         </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={()=> router.push("/screens/DoctorsReport")}>
           
          <Text style={styles.menuText}><Image source={require("../../assets/images/Doctor.png")}></Image>Doctor's Report</Text>
           
@@ -115,7 +145,15 @@ useEffect(() => {
   {/* User Profile Footer */}
   <TouchableOpacity onPress={()=> router.push("/screens/SettingScreen")}>
     <View style={styles.footer}>
-      <Image source={require("../../assets/images/user.png")} style={styles.profileImage} />
+      {selectedImage?.uri ? (
+                <Image
+                  source={{ uri: selectedImage.uri }}
+                  style={{ width: 40, height: 40, borderRadius: 50 }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Image source={require("../../assets/images/user.png")} style={styles.profileImage} />
+              )}
       <Text style={styles.userName}>{firstName || "Guest"}</Text>
     </View>
   </TouchableOpacity>
@@ -334,6 +372,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
     color: "#000",
+    marginLeft:5,
   },
   greeting: {
     fontSize: 30,
@@ -419,7 +458,7 @@ const styles = StyleSheet.create({
   disclaimer: {
     fontSize: 10,
     color: "gray",
-    marginTop: 20,
+    marginTop: 80,
   },
 });
 
