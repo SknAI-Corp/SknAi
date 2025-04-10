@@ -1,10 +1,12 @@
-// utils/pdfUploader.js
-import PDFDocument from "pdfkit";
-import fs from "fs";
-import path from "path";
-import { uploadOnCloudinary } from "./cloudinary.js";
+import PDFDocument from 'pdfkit';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { uploadOnCloudinary } from './cloudinary.js';
 
-// Generates PDF, uploads to Cloudinary, and returns the URL
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 export const generateAndUploadPDF = async ({
   userName,
   userEmail,
@@ -12,61 +14,85 @@ export const generateAndUploadPDF = async ({
   imageUrls = [],
   sessionId
 }) => {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50 });
-    const filePath = `./temp/report-${sessionId}.pdf`;
+  try {
+    const tempDir = path.join(__dirname, 'temp');
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
+    const fileName = `report_${sessionId}_${Date.now()}.pdf`;
+    const filePath = path.join(tempDir, fileName);
+
+    const doc = new PDFDocument();
     const writeStream = fs.createWriteStream(filePath);
     doc.pipe(writeStream);
 
-    // Title
-    doc.fontSize(20).text("🧾 AI Dermatology Report", { align: "center" });
-    doc.moveDown();
+    // Title and Patient Info
+    doc.fontSize(20).text("Dermatology Report", { align: 'center' }).moveDown();
+    doc.fontSize(12).text(`Patient Name: ${userName}`);
+    doc.text(`Email: ${userEmail}`);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`).moveDown();
 
-    // User Info
-    doc.fontSize(12).text(`👤 Name: ${userName}`);
-    doc.text(`📧 Email: ${userEmail}`);
-    doc.moveDown();
+    // AI Generated Report
+    doc.fontSize(14).text("AI Generated Summary:", { underline: true }).moveDown(0.5);
+    doc.fontSize(12).text(aiReportText).moveDown();
 
-    // Report Content
-    doc.fontSize(14).text("📄 AI Generated Summary", { underline: true });
-    doc.moveDown(0.5);
-    doc.fontSize(12).text(aiReportText, {
-      align: "left"
-    });
-    doc.moveDown();
-
-    // Images Section
-    if (imageUrls.length > 0) {
-      doc.fontSize(14).text("🖼️ Uploaded Images", { underline: true });
-      doc.moveDown(0.5);
-
-      for (const url of imageUrls) {
-        try {
-          doc.image(url, {
-            fit: [400, 300],
-            align: "center"
-          });
-          doc.moveDown();
-        } catch (err) {
-          doc.text("⚠️ Failed to load image.");
-        }
+    // Images
+    for (const imageUrl of imageUrls) {
+      try {
+        const imagePath = await downloadImageToTemp(imageUrl, tempDir);
+        doc.addPage();
+        doc.fontSize(14).text("Image:", { underline: true }).moveDown(0.5);
+        doc.image(imagePath, {
+          fit: [450, 450],
+          align: 'center',
+          valign: 'center'
+        });
+        fs.unlinkSync(imagePath); // Clean up temp image
+      } catch (err) {
+        console.error("Failed to add image:", err.message);
       }
     }
 
     doc.end();
 
-    writeStream.on("finish", async () => {
-      const cloudRes = await uploadOnCloudinary(filePath);
+    // Wait for PDF to finish writing
+    await new Promise(resolve => writeStream.on('finish', resolve));
+
+    // Upload to Cloudinary
+    const uploaded = await uploadOnCloudinary(filePath);
+
+    // Clean up the temporary file after upload
+    try {
       fs.unlinkSync(filePath);
+    } catch (e) {
+      console.error("Failed to delete temp PDF:", e.message);
+    }
 
-      if (cloudRes?.url) {
-        resolve(cloudRes.url);
-      } else {
-        reject("Cloudinary upload failed");
-      }
-    });
+    return uploaded?.url || null;
+  } catch (error) {
+    console.error("PDF generation error:", error.message);
+    return null;
+  }
+};
 
-    writeStream.on("error", reject);
+// Helper to download images to temp directory
+const downloadImageToTemp = async (url, tempDir) => {
+  const axios = await import('axios');
+  const { default: fsExtra } = await import('fs-extra');
+
+  const response = await axios.default({
+    method: 'GET',
+    url,
+    responseType: 'stream'
+  });
+
+  const fileName = `img_${Date.now()}.jpg`;
+  const filePath = path.join(tempDir, fileName);
+  const writer = fs.createWriteStream(filePath);
+
+  response.data.pipe(writer);
+
+  return new Promise((resolve, reject) => {
+    writer.on('finish', () => resolve(filePath));
+    writer.on('error', reject);
   });
 };
