@@ -16,10 +16,12 @@ from bson import ObjectId
 from langchain_mistralai import ChatMistralAI
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
 from langchain.memory import ConversationSummaryBufferMemory
-from langchain.memory.chat_message_histories import RedisChatMessageHistory
+from langchain_community.chat_message_histories import RedisChatMessageHistory
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_pinecone import PineconeVectorStore
+from langchain_community.vectorstores import Pinecone as LangchainPinecone
+from pinecone import Pinecone  # This is the client
+
 
 from langchain_core.runnables import RunnableLambda
 
@@ -56,7 +58,16 @@ log_collection = mongo_db[COLLECTION_NAME]
 tokenizer, model = load_biobert_model()
 pinecone_index = initialize_pinecone()
 from embeddings.embedder import BioBERTEmbedding
-vector_store = PineconeVectorStore(index=pinecone_index, embedding=BioBERTEmbedding(), text_key="text")
+# Then use the renamed import
+# With this import
+from langchain_pinecone import PineconeVectorStore
+
+# And then initialize it like this
+vector_store = PineconeVectorStore(
+    index=pinecone_index,
+    embedding=BioBERTEmbedding(),
+    text_key="text"
+)
 
 
 # ---------------------- Models ---------------------- #
@@ -120,11 +131,8 @@ Provide a medically-informed yet easy-to-understand summary covering:
 3. Likely Causes
 4. How it's Diagnosed
 5. Treatment Options
-6. Prevention Tips
-7. When to Seek a Dermatologist
-8. Long-term Care Advice
 
-Be concise, reliable, and use plain language suitable for a non-medical audience. Use Bullet points for clarity.
+Be concise, reliable, and use plain language suitable for a non-medical audience. Use Bullet points for clarity. 
 """
 def log_and_invoke(chain, inputs):
     logger.info("📤 Final input to LLM:")
@@ -160,16 +168,22 @@ async def chat_with_ai(request: ChatRequest):
         chat_history = memory.chat_memory.messages
 
         report_prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are an AI assistant preparing a formal skin consultation summary for a dermatologist review.
+            ("system", """You are an AI assistant preparing a formal dermatology consultation report for dermatologist review.
 
-Use the chat history below and this final user query to generate a well-structured report covering:
-- Suspected condition(s)
-- Key symptoms described
-- AI's previous suggestions
-- Follow-up question by user (if any)
-- Recommendations for dermatologist
+Based on the chat history and the final user message, generate a structured clinical report including:
 
-Structure it clearly in markdown bullet points with simple clinical clarity.
+- **Patient Overview**: A brief summary of the patient's context, age (if available), and concerns.
+- **Suspected Dermatological Condition(s)**: Clearly list the likely skin condition(s) with confidence level if available.
+- **Clinical Findings / Described Symptoms**: Extract and list all key symptoms or skin features mentioned by the patient (e.g., rash, itching, location, duration, triggers).
+- **AI Analysis Summary**: Summarize any diagnostic insight from the image model and AI suggestions from earlier messages.
+- **Patient Follow-up / Concerns**: Include any questions or concerns raised by the user after the AI’s initial response.
+- **Recommendations for Dermatologist**:
+  - Note any further examination needed (e.g., biopsy, dermatoscopy).
+  - Flag any red-flag symptoms or unclear presentations.
+  - Include AI's confidence in diagnosis and whether a human review is strongly recommended.
+
+Write the report in markdown bullet points, using clear and professional medical language suitable for clinical records.
+
 """),
             MessagesPlaceholder("chat_history"),
             ("human", "User note: {input}")
@@ -177,8 +191,10 @@ Structure it clearly in markdown bullet points with simple clinical clarity.
 
         chain = report_prompt | get_llm()
 
+        # FIX: Include chat_history in the ainvoke call
         report_response = await chain.ainvoke({
-            "input": request.user_message or "Please summarize the session and user concern."
+            "input": request.user_message or "Please summarize the session and user concern.",
+            "chat_history": chat_history  # Added this line to include chat_history
         })
 
         return ChatResponse(
