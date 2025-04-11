@@ -94,7 +94,7 @@ from langchain.chat_models import ChatOpenAI
 @lru_cache()
 def get_llm():
     logger.info(f"Initializing ChatGPT LLM ")
-    return ChatOpenAI(model="gpt-4o-mini", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
+    return ChatOpenAI(model="gpt-3.5-turbo", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY")) # use gpt-4o-mini during testing
 def get_message_history(session_id: str):
     redis_url = f"redis://{os.getenv('REDIS_USERNAME')}:{os.getenv('REDIS_PASSWORD')}@{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}"
     return RedisChatMessageHistory(url=redis_url, session_id=session_id)
@@ -185,15 +185,14 @@ Based on the chat history and the final user message, generate a structured clin
 Write the report in markdown bullet points, using clear and professional medical language suitable for clinical records.
 
 """),
-            MessagesPlaceholder("chat_history"),
-            ("human", "User note: {input}")
+            MessagesPlaceholder("chat_history")
         ])
 
         chain = report_prompt | get_llm()
 
         # FIX: Include chat_history in the ainvoke call
         report_response = await chain.ainvoke({
-            "input": request.user_message or "Please summarize the session and user concern.",
+            "input": "Please summarize the session and user concern.",
             "chat_history": chat_history  # Added this line to include chat_history
         })
 
