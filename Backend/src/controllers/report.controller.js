@@ -80,7 +80,7 @@ const verifyWithDermatologist = asyncHandler(async (req, res) => {
 
   return res.status(201).json(
     new ApiResponse("Report submitted to dermatologist", report, 201)
-  );
+  );
 });
 
 // GET /api/v1/reports?userId=xyz

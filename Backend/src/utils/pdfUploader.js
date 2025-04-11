@@ -1,8 +1,9 @@
-import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
-import { uploadOnCloudinary } from "./cloudinary.js";
+import { uploadOnCloudinary, uploadBufferToCloudinary } from "./cloudinary.js";
 import { fileURLToPath } from "url";
+import { generateHTMLReport } from "./reportTemplate.js";
+import puppeteer from "puppeteer";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

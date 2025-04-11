@@ -11,17 +11,21 @@ cloudinary.config({
 const uploadOnCloudinary = async (localfilePath) => {
   try {
     if (!localfilePath) return null;
+
     const response = await cloudinary.uploader.upload(localfilePath, {
       resource_type: 'auto',
     });
+
     console.log("File uploaded successfully!", response.url);
-    fs.unlinkSync(localfilePath);
+
+    if (fs.existsSync(localfilePath)) fs.unlinkSync(localfilePath);
     return response;
   } catch (error) {
-    fs.unlinkSync(localfilePath);
+    if (fs.existsSync(localfilePath)) fs.unlinkSync(localfilePath);
     return null;
   }
 };
+
 
 // Upload from buffer (for Puppeteer PDF)
 const uploadBufferToCloudinary = (buffer, sessionId) => {
