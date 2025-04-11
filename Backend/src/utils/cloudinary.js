@@ -32,8 +32,11 @@ const uploadBufferToCloudinary = (buffer, sessionId) => {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
-        resource_type: "raw",
-        public_id: `sknai/report_${sessionId}`
+        resource_type: "auto",
+        format: "pdf",
+        folder: "sknai",
+        public_id: `sknai/report_${sessionId}`,
+        type: "upload"
       },
       (error, result) => {
         if (error) {
