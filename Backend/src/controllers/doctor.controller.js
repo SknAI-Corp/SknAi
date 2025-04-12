@@ -68,4 +68,10 @@ const getDoctorProfile = async (req, res) => {
   res.status(200).json(new ApiResponse("Doctor profile", req.doctor, 200));
 };
 
-export { registerDoctor, loginDoctor, logoutDoctor, getDoctorProfile };
+const getAllDoctors = async (req, res) => {
+  const doctors = await Doctor.find().select("-password -refreshToken"); // hide sensitive fields
+
+  res.status(200).json(new ApiResponse("All doctors fetched", doctors, 200));
+};
+
+export { registerDoctor, loginDoctor, logoutDoctor, getDoctorProfile, getAllDoctors };
