@@ -85,7 +85,7 @@ const verifyWithDermatologist = asyncHandler(async (req, res) => {
 
 // GET /api/v1/reports?userId=xyz
 const getReports = asyncHandler(async (req, res) => {
-  const userId = req.query.userId;
+  const userId = req.user._id;
 
   if (!userId) {
     throw new ApiError(400, "userId is required");

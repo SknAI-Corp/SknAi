@@ -1,3 +1,7 @@
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 import fs from "fs";
 import path from "path";
 import { uploadOnCloudinary, uploadBufferToCloudinary } from "./cloudinary.js";
@@ -6,7 +10,7 @@ import { generateHTMLReport } from "./reportTemplate.js";
 import puppeteer from "puppeteer";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const _dirname = path.dirname(__filename);
 
 export const generateAndUploadPDF = async ({
   userName,
@@ -41,12 +45,12 @@ export const generateAndUploadPDF = async ({
 
     await browser.close();
 
-    // ⬆️ Upload from buffer
+    // ⬆ Upload from buffer
     const pdfUrl = await uploadBufferToCloudinary(pdfBuffer, sessionId);
     return pdfUrl;
 
   } catch (error) {
     console.error("PDF generation error:", error.message);
-    return null;
-  }
+    return null;
+  }
 };

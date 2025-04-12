@@ -14,6 +14,7 @@ import {
   ScrollView,
   Keyboard,
   Button,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -23,6 +24,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "./config";
 import Markdown from 'react-native-markdown-display';
+import uuid from 'react-native-uuid';
 
 type Message = {
   id?: string;
@@ -32,10 +34,16 @@ type Message = {
   temp?: boolean;
 };
 
-export default function ChatScreen() {
-  const { sessionId: routeSessionId } = useLocalSearchParams();
-  const router = useRouter();
-  const [sessionId, setSessionId] = useState<string | null>(null);
+export default function Guest() {
+    const { guest, guestToken, sessionId: sessionIdParam  } = useLocalSearchParams();
+    const isGuest = guest === 'true';
+const router = useRouter();
+
+const [sessionId, setSessionId] = useState<string | null>(
+    typeof sessionIdParam === 'string' ? sessionIdParam : null
+  );
+
+const [guestMessageCount, setGuestMessageCount] = useState(0);
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [message, setMessage] = useState("");
   const [selectedImage, setSelectedImage] = useState<null | {
@@ -43,57 +51,15 @@ export default function ChatScreen() {
     name: string;
     type: string;
   }>(null);
-  const [selectedImages, setSelectedImages] = useState<
-    Array<{ uri: string; name: string; type: string }>
-  >([]);
 
   const [typingMessage, setTypingMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalVisible2, setModalVisible2] = useState(false);
+  
   const [permission, setPermission] = useState<boolean | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const flatListRef = useRef<FlatList<Message>>(null);
   const slideAnim = useRef(new Animated.Value(300)).current;
-  const [hasApiResponse, setHasApiResponse] = useState(false);
-  const [inputText, setInputText] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (routeSessionId) {
-      const id = routeSessionId as string;
-      console.log(id);
-      setSessionId(id);
-      fetchMessages(id);
-      setIsChatOpen(true); // <-- ensure chat is visible
-    }
-  }, [routeSessionId]);
-
-  useEffect(() => {
-    flatListRef.current?.scrollToEnd({ animated: true });
-  }, [chatMessages, typingMessage]);
-
-  const fetchMessages = async (id: string) => {
-    const accessToken = await AsyncStorage.getItem("accessToken");
-
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/v1/messages?sessionId=${id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
-      const messages = response.data.data;
-
-      setChatMessages(messages);
-      setIsChatOpen(true);
-      setHasApiResponse(messages);
-    } catch (error) {
-      console.error("Error fetching session messages:", error);
-    }
-  };
 
   const handleSendMessage = async () => {
     Keyboard.dismiss();
@@ -101,62 +67,72 @@ export default function ChatScreen() {
     const hasText = message.trim().length > 0;
     const hasImage = !!selectedImage;
   
-    // Case 1: Nothing provided
     if (!hasText && !hasImage) {
-      console.warn("Please enter a message or select an image.");
+      Alert.alert('Warning', 'Please enter a message or select an image.');
       return;
     }
   
-    // Case 2: Only image → use default message
-    let finalMessage = hasText ? message.trim() : "What is this?";
+    const finalMessage = hasText ? message.trim() : 'What is this?';
   
-    const accessToken = await AsyncStorage.getItem("accessToken");
-  
+    const isGuest = guest === 'true';
+    // const guestToken = isGuest ? `guest-${uuid.v4()}` : await AsyncStorage.getItem("accessToken");
+//   console.log(guestToken);
     const userMsgObj: Message = {
-      sender: "user",
-      content: finalMessage,
-      imageAttached: selectedImage?.uri || null,
-    };
+        sender: 'user', // TypeScript now understands it's one of the allowed types
+        content: finalMessage,
+        imageAttached: selectedImage?.uri || null,
+      };
     setChatMessages((prev) => [...prev, userMsgObj]);
-    setMessage("");
+    setMessage('');
     setSelectedImage(null);
     setLoading(true);
   
-    const thinkingMsgObj: Message = {
+    setChatMessages((prev) => [...prev, {
       id: Date.now().toString(),
-      sender: "ai",
-      content: "thinking...",
+      sender: 'ai',
+      content: 'thinking...',
       imageAttached: null,
       temp: true,
-    };
-    setChatMessages((prev) => [...prev, thinkingMsgObj]);
+    }]);
   
     try {
       const formData = new FormData();
-      if (sessionId) formData.append("sessionId", sessionId);
-      formData.append("content", finalMessage);
   
-      if (hasImage) {
-        formData.append("imageAttached", {
-          uri: selectedImage.uri,
-          name: selectedImage.name,
-          type: selectedImage.type,
-        } as any);
+      if (typeof sessionId === 'string') {
+        formData.append('sessionId', sessionId);
+      }
+  
+      formData.append('content', finalMessage);
+  
+      if (hasImage && selectedImage?.uri) {
+        const localUri = selectedImage.uri;
+        const filename = selectedImage.name || localUri.split('/').pop();
+        const match = /\.(\w+)$/.exec(filename || '');
+        const type = selectedImage.type || (match ? `image/${match[1]}` : `image`);
+      
+        formData.append('imageAttached', {
+          uri: localUri,
+          name: filename,
+          type,
+        } as any); // 👈 Use `as any` because React Native doesn't have a native Blob/File
       }
   console.log(formData);
       const response = await axios.post(`${API_BASE_URL}/api/v1/messages/`, formData, {
         headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${guestToken}`,
+          'Content-Type': 'multipart/form-data',
         },
       });
-  
+  console.log(response.data.data);
       const { sessionId: returnedSessionId, aiMessage } = response.data.data;
-      if (!sessionId) setSessionId(returnedSessionId);
+  
+      if (!sessionId && returnedSessionId) setSessionId(returnedSessionId);
+  
       setChatMessages((prev) => prev.filter((msg) => !msg.temp));
   
-      let aiContent = "";
-      setTypingMessage("");
+      let aiContent = '';
+      setTypingMessage('');
+  
       for (let i = 0; i < aiMessage.content.length; i++) {
         setTimeout(() => {
           aiContent += aiMessage.content[i];
@@ -165,68 +141,27 @@ export default function ChatScreen() {
       }
   
       setTimeout(() => {
-        setChatMessages((prev) => [
-          ...prev,
-          { sender: "ai", content: aiMessage.content, imageAttached: null },
-        ]);
-        setTypingMessage("");
+        setChatMessages((prev) => [...prev, {
+          sender: 'ai',
+          content: aiMessage.content,
+          imageAttached: null,
+        }]);
+        setTypingMessage('');
       }, aiMessage.content.length * 30 + 200);
+  
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error('Error sending message:', error);
+      Alert.alert('Error', 'Something went wrong while sending your message.');
     } finally {
       setLoading(false);
     }
   };
   
-  // this function for doctorverify
-  const handleVerify = async () => {
-    if (!sessionId || !inputText || selectedImages.length === 0) {
-      setError("Please provide sessionId, query, and at least one image.");
-      return;
-    }
   
-    const accessToken = await AsyncStorage.getItem("accessToken");
-    setLoading(true);
-    setError(null);
-  
-    const formData = new FormData();
-    formData.append("sessionId", sessionId);
-    formData.append("userQuery", inputText);
-  
-    try {
-      for (let index = 0; index < selectedImages.length; index++) {
-        const image = selectedImages[index];
-  
-        formData.append("images", {
-          uri: image.uri,
-          name: image.name || `image-${index}.jpg`,
-          type: image.type || "image/jpeg",
-        } as any);
-      }
-  
-      const response = await axios.post(
-        `${API_BASE_URL}/api/v1/reports/verify`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "multipart/form-data"
-          }
-        }
-      );
-  
-      console.log("Response Status:", response.status);
-      console.log("Response Data:", response.data);
-      alert(response.data.message);
-  
-    } catch (error) {
-      
-      setError("Failed to submit the report. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+ 
+  const handleCancelImage = () => {
+    setSelectedImage(null); // Reset selected image
   };
-
   const openModal = () => setModalVisible(true);
   const closeModal = () => setModalVisible(false);
   const setImageUri = () => {};
@@ -238,11 +173,6 @@ export default function ChatScreen() {
       duration: 300,
       useNativeDriver: true,
     }).start();
-
-    if (!routeSessionId) {
-      setSessionId(null);
-      setChatMessages([]);
-    }
 
     setIsChatOpen(true);
   };
@@ -309,45 +239,8 @@ export default function ChatScreen() {
       });
     }
   };
-  // this pickimage for doctorverify
-  const verifyImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-
-    if (!result.canceled && result.assets.length > 0) {
-      const pickedAsset = result.assets[0];
-      const localUri = pickedAsset.uri;
-      const fileName = localUri.split("/").pop() || `photo.jpg`;
-      const fileType = pickedAsset.type
-        ? `${pickedAsset.type}/jpeg`
-        : "image/jpeg";
-        const response = await fetch(localUri);
-        const blob = await response.blob();
-        const image = {
-          uri: localUri,
-          name: fileName,
-          type: fileType,
-          blob: blob,  // Adding the Blob as part of the image object
-        };
-    
-        // Append the image to the selected images array
-        setSelectedImages((prevImages) => [
-          ...prevImages,
-          image,  // Add the image object with the blob to state
-        ]);
-    }
-  };
-  const handleCancelImage = () => {
-    setSelectedImages([]); // Reset selected image
-  };
-  const handleCancel = () => {
-    setModalVisible2(false);
-    setSelectedImages([]); // Close the modal when Cancel is pressed
-  };
+  
+  
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -363,16 +256,9 @@ export default function ChatScreen() {
             <Ionicons name="arrow-back" size={24} color="black" />
           </TouchableOpacity>
           <Text style={styles.title}>
-            {routeSessionId ? "Chat" : "New Chat"}
+            { "New Chat"}
           </Text>
-          <Ionicons
-            name="medkit"
-            size={24}
-            color={hasApiResponse ? "black" : "gray"}
-            disabled={!hasApiResponse}
-            style={styles.doctorIcon}
-            onPress={() => setModalVisible2(true)}
-          />
+          
         </View>
 
         {!isChatOpen && (
@@ -459,46 +345,10 @@ export default function ChatScreen() {
             </View>
           </View>
         </Modal>
-        {/* this modal is for doctorverify */}
-        <Modal visible={modalVisible2} transparent animationType="slide">
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <TextInput
-                style={styles.input1}
-                placeholder="Enter text here"
-                value={inputText}
-                onChangeText={setInputText}
-              />
-              {/* Image Upload Button */}
-              <TouchableOpacity
-                onPress={verifyImage}
-                style={styles.uploadButton}
-              >
-                <Text>Upload Image</Text>
-              </TouchableOpacity>
-
-              {/* Display selected images */}
-              {selectedImages &&
-                selectedImages.length > 0 &&
-                selectedImages.map((image, index) => (
-                  <Image
-                    key={index}
-                    source={{ uri: image.uri }}
-                    style={{ width: 100, height: 100, marginBottom: 10 }}
-                  />
-                ))}
-
-              {/* Verify Button */}
-              <Button title="Verify" onPress={handleVerify} />
-              <TouchableOpacity onPress={handleCancel}>
-                <Text style={styles.modalText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
+       
       </View>
         {/* Footer */}
-              <Text style={styles.footerText}>SknAI can make mistakes.Check important info</Text>
+     <Text style={styles.footerText}>SknAI can make mistakes.Check important info</Text>
     </KeyboardAvoidingView>
   );
 }
@@ -618,28 +468,7 @@ const styles = StyleSheet.create({
     color: "black",
     paddingBottom:0
   },
-  input1: {
-    height: 40,
-    width: '100%',
-    borderColor: '#ddd',
-    borderWidth: 1,
-    marginBottom: 15,
-    paddingLeft: 10,
-    borderRadius: 8,
-    fontSize: 16,
-  },
-  uploadButton: {
-    marginBottom: 15,
-    backgroundColor: '#4CAF50',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  uploadButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  
 });
 
 export const markdownStyles: any = {

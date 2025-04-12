@@ -73,10 +73,7 @@ export const generateHTMLReport = ({
         <div class="section-title">AI Generated Summary</div>
         <div class="summary">${aiReportText}</div>
   
-        ${doctorRemarks ? `
-          <div class="section-title">Doctor's Remarks</div>
-          <div class="summary">${doctorRemarks}</div>
-        ` : ''}
+        
   
         ${imageUrls.map(url => `
           <div class="section-title">Uploaded Image</div>
@@ -84,6 +81,11 @@ export const generateHTMLReport = ({
             <img src="${url}" />
           </div>
         `).join('')}
+
+        ${doctorRemarks ? `
+          <div class="section-title">Doctor's Remarks</div>
+          <div class="summary">${doctorRemarks}</div>
+        ` : ''}
       </body>
     </html>
     `;

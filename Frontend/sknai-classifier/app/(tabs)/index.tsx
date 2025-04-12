@@ -2,17 +2,22 @@ import React, { useEffect } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Buffer } from 'buffer';
 const IndexScreen = () => {
   const router = useRouter();
-
+  if (typeof global.Buffer === 'undefined') {
+    global.Buffer = Buffer;
+  }
   useEffect(() => {
     const checkAuth = async () => {
       const token = await AsyncStorage.getItem("accessToken");
       if (token) {
-        router.replace("/screens/HomeScreen"); // Redirect to Home if logged in
+        router.replace("/screens/DoctorScreen"); // Redirect to Home if logged in
       } else {
+        await AsyncStorage.clear();
         setTimeout(() => {
           router.replace("/screens/GetStarted"); // Otherwise, show GetStarted
+          
         }, 5000);
       }
     };

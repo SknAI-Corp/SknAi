@@ -89,20 +89,46 @@ const sendMessage = asyncHandler(async (req, res) => {
   }
 
   let session;
+  // 
+  const isGuest = req.user?.userId === "guest";
 
   // 🧠 If no sessionId passed → create new session
-  if (!sessionId) {
-    session = await Session.create({
-      userId: req.user._id,
-      title: "Untitled Chat"
-    });
-    sessionId = session._id;
+  if (isGuest) {
+    // 👤 GUEST FLOW
+    if (!sessionId) {
+      // Create a new guest session with custom ID
+      sessionId = uuidv4().replace(/-/g, ""); // frontend can also do this
+      session = await Session.create({
+        sessionId,
+        userId: null,
+        title: "Untitled Chat"
+      });
+    } else {
+      session = await Session.findOne({ sessionId }); // ✅ Match by string sessionId
+      if (!session) {
+        // Create if not found
+        session = await Session.create({
+          sessionId,
+          userId: null,
+          title: "Untitled Chat"
+        });
+      }
+    }
   } else {
-    session = await Session.findById(sessionId);
-    if (!session) throw new ApiError(404, "Session not found");
+    // 👤 AUTHENTICATED USER FLOW
+    if (!sessionId) {
+      session = await Session.create({
+        userId: req.user._id,
+        title: "Untitled Chat"
+      });
+      sessionId = session._id;
+    } else {
+      session = await Session.findById(sessionId);
+      if (!session) throw new ApiError(404, "Session not found");
 
-    if (session.userId.toString() !== req.user._id.toString()) {
-      throw new ApiError(403, "Unauthorized access to session");
+      if (session.userId.toString() !== req.user._id.toString()) {
+        throw new ApiError(403, "Unauthorized access to session");
+      }
     }
   }
 
@@ -117,11 +143,11 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   // 💬 Save user message
   const userMsg = await Message.create({
-    sessionId,
+    sessionId: isGuest ? session.sessionId : session._id, // 👈 use correct key
     sender: "user",
     content: userMessage,
     imageAttached: imageUrl,
-    userId: req.user._id
+    userId: isGuest ? null : req.user._id
   });
 
   // 🧠 Predict disease (optional)
@@ -135,7 +161,7 @@ const sendMessage = asyncHandler(async (req, res) => {
   const aiReply = await callQnAAPI({
     user_message: userMessage,
     predicted_disease: predictedDisease,
-    session_id: sessionId
+    session_id: isGuest ? session.sessionId : session._id
   });
 
   if (!aiReply?.response) {
@@ -143,14 +169,16 @@ const sendMessage = asyncHandler(async (req, res) => {
   }
 
   const aiMsg = await Message.create({
-    sessionId,
+    sessionId: isGuest ? session.sessionId : session._id,
     sender: "ai",
     content: aiReply.response,
-    userId: req.user._id
+    userId: isGuest ? null : req.user._id
   });
 
   // 📝 Auto-update session title only if it's still "Untitled Chat"
-  const existingMessages = await Message.countDocuments({ sessionId });
+  const existingMessages = await Message.countDocuments({
+    sessionId: isGuest ? session.sessionId : session._id
+  });
 
   if (existingMessages <= 2 && session.title === "Untitled Chat") {
     session.title = aiReply.response.slice(0, 20).replace(/\n/g, " ");
@@ -161,7 +189,7 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   return res.status(201).json(
     new ApiResponse("Message and response saved", {
-      sessionId: session._id,
+      sessionId: isGuest ? session.sessionId : session._id,
       sessionTitle: session.title,
       userMessage: userMsg,
       aiMessage: aiMsg
