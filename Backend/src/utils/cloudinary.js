@@ -37,11 +37,7 @@ const uploadBufferToCloudinary = (buffer, sessionId) => {
         folder: "sknai",
         public_id: `sknai/report_${sessionId}`,
         type: "upload"
-<<<<<<< Updated upstream
       },
-=======
-      },
->>>>>>> Stashed changes
       (error, result) => {
         if (error) {
           console.error("Cloudinary buffer upload error:", error);
