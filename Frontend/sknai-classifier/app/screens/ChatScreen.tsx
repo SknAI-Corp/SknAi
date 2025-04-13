@@ -515,7 +515,9 @@ export default function ChatScreen() {
                 ))}
 
               {/* Verify Button */}
-              <Button title="Verify" onPress={handleVerify} />
+              <TouchableOpacity style={styles.verifyButton} onPress={handleVerify}>
+  <Text style={styles.verifyButtonText}>✅ Verify</Text>
+</TouchableOpacity>
               <TouchableOpacity onPress={handleCancel}>
                 <Text style={styles.modalText}>Cancel</Text>
               </TouchableOpacity>
@@ -667,6 +669,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
+  verifyButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+    marginBottom:8
+  },
+  verifyButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  }
+  
 });
 
 export const markdownStyles: any = {

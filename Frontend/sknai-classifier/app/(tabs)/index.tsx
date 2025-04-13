@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Buffer } from 'buffer';
+import {jwtDecode } from "jwt-decode";
 const IndexScreen = () => {
   const router = useRouter();
   if (typeof global.Buffer === 'undefined') {
@@ -11,17 +12,31 @@ const IndexScreen = () => {
   useEffect(() => {
     const checkAuth = async () => {
       const token = await AsyncStorage.getItem("accessToken");
+  
       if (token) {
-        router.replace("/screens/HomeScreen"); // Redirect to Home if logged in
+        try {
+          const decoded: any = jwtDecode (token);
+          const currentTime = Date.now() / 1000; // in seconds
+  
+          if (decoded.exp && decoded.exp < currentTime) {
+            // Token expired
+            await AsyncStorage.clear();
+            router.replace("/screens/GetStarted");
+          } else {
+            // Token is valid
+            router.replace("/screens/HomeScreen");
+          }
+        } catch (error) {
+          // Invalid token format
+          await AsyncStorage.clear();
+          router.replace("/screens/GetStarted");
+        }
       } else {
         await AsyncStorage.clear();
-        setTimeout(() => {
-          router.replace("/screens/GetStarted"); // Otherwise, show GetStarted
-          
-        }, 5000);
+        router.replace("/screens/GetStarted");
       }
     };
-
+  
     checkAuth();
   }, []);
   // useEffect(() => {
