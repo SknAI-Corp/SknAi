@@ -22,7 +22,7 @@ import { Camera } from "expo-camera";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "./config";
-import Markdown from 'react-native-markdown-display';
+import Markdown from "react-native-markdown-display";
 
 type Message = {
   id?: string;
@@ -58,6 +58,26 @@ export default function ChatScreen() {
   const [hasApiResponse, setHasApiResponse] = useState(false);
   const [inputText, setInputText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [hasDoctors, setHasDoctors] = useState(false);
+
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/v1/doctor/all-doctors`);
+        if (response.data?.data?.length > 0) {
+          setHasDoctors(true);
+        } else {
+          setHasDoctors(false);
+        }
+      } catch (error) {
+        console.error("Error fetching doctors:", error);
+        setHasDoctors(false);
+      }
+    };
+  
+    fetchDoctors();
+  }, []);
+
 
   useEffect(() => {
     if (routeSessionId) {
@@ -97,21 +117,21 @@ export default function ChatScreen() {
 
   const handleSendMessage = async () => {
     Keyboard.dismiss();
-  
+
     const hasText = message.trim().length > 0;
     const hasImage = !!selectedImage;
-  
+
     // Case 1: Nothing provided
     if (!hasText && !hasImage) {
       console.warn("Please enter a message or select an image.");
       return;
     }
-  
+
     // Case 2: Only image → use default message
     let finalMessage = hasText ? message.trim() : "What is this?";
-  
+
     const accessToken = await AsyncStorage.getItem("accessToken");
-  
+
     const userMsgObj: Message = {
       sender: "user",
       content: finalMessage,
@@ -121,7 +141,7 @@ export default function ChatScreen() {
     setMessage("");
     setSelectedImage(null);
     setLoading(true);
-  
+
     const thinkingMsgObj: Message = {
       id: Date.now().toString(),
       sender: "ai",
@@ -130,12 +150,12 @@ export default function ChatScreen() {
       temp: true,
     };
     setChatMessages((prev) => [...prev, thinkingMsgObj]);
-  
+
     try {
       const formData = new FormData();
       if (sessionId) formData.append("sessionId", sessionId);
       formData.append("content", finalMessage);
-  
+
       if (hasImage) {
         formData.append("imageAttached", {
           uri: selectedImage.uri,
@@ -143,18 +163,22 @@ export default function ChatScreen() {
           type: selectedImage.type,
         } as any);
       }
-  console.log(formData);
-      const response = await axios.post(`${API_BASE_URL}/api/v1/messages/`, formData, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "multipart/form-data",
-        },
-      });
-  
+      console.log(formData);
+      const response = await axios.post(
+        `${API_BASE_URL}/api/v1/messages/`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
       const { sessionId: returnedSessionId, aiMessage } = response.data.data;
       if (!sessionId) setSessionId(returnedSessionId);
       setChatMessages((prev) => prev.filter((msg) => !msg.temp));
-  
+
       let aiContent = "";
       setTypingMessage("");
       for (let i = 0; i < aiMessage.content.length; i++) {
@@ -163,7 +187,7 @@ export default function ChatScreen() {
           setTypingMessage(aiContent);
         }, i * 30);
       }
-  
+
       setTimeout(() => {
         setChatMessages((prev) => [
           ...prev,
@@ -177,54 +201,52 @@ export default function ChatScreen() {
       setLoading(false);
     }
   };
-  
+
   // this function for doctorverify
   const handleVerify = async () => {
     if (!sessionId || !inputText || selectedImages.length === 0) {
       setError("Please provide sessionId, query, and at least one image.");
       return;
     }
-  
+
     const accessToken = await AsyncStorage.getItem("accessToken");
     setLoading(true);
     setError(null);
-  
+
     const formData = new FormData();
     formData.append("sessionId", sessionId);
     formData.append("userQuery", inputText);
-  
+
     try {
       for (let index = 0; index < selectedImages.length; index++) {
         const image = selectedImages[index];
-  
+
         formData.append("images", {
           uri: image.uri,
           name: image.name || `image-${index}.jpg`,
           type: image.type || "image/jpeg",
         } as any);
       }
-  
+
       const response = await axios.post(
         `${API_BASE_URL}/api/v1/reports/verify`,
         formData,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "multipart/form-data"
-          }
+            "Content-Type": "multipart/form-data",
+          },
         }
       );
-  
+
       console.log("Response Status:", response.status);
       console.log("Response Data:", response.data);
       alert(response.data.message);
-  
     } catch (error) {
-      
       setError("Failed to submit the report. Please try again.");
     } finally {
       setLoading(false);
-    }
+    }
   };
 
   const openModal = () => setModalVisible(true);
@@ -264,7 +286,9 @@ export default function ChatScreen() {
             : styles.aiMessage,
         ]}
       >
-        {item.content && <Markdown style={markdownStyles}>{item.content}</Markdown>}
+        {item.content && (
+          <Markdown style={markdownStyles}>{item.content}</Markdown>
+        )}
         {item.imageAttached && (
           <Image
             source={{ uri: item.imageAttached }}
@@ -325,20 +349,20 @@ export default function ChatScreen() {
       const fileType = pickedAsset.type
         ? `${pickedAsset.type}/jpeg`
         : "image/jpeg";
-        const response = await fetch(localUri);
-        const blob = await response.blob();
-        const image = {
-          uri: localUri,
-          name: fileName,
-          type: fileType,
-          blob: blob,  // Adding the Blob as part of the image object
-        };
-    
-        // Append the image to the selected images array
-        setSelectedImages((prevImages) => [
-          ...prevImages,
-          image,  // Add the image object with the blob to state
-        ]);
+      const response = await fetch(localUri);
+      const blob = await response.blob();
+      const image = {
+        uri: localUri,
+        name: fileName,
+        type: fileType,
+        blob: blob, // Adding the Blob as part of the image object
+      };
+
+      // Append the image to the selected images array
+      setSelectedImages((prevImages) => [
+        ...prevImages,
+        image, // Add the image object with the blob to state
+      ]);
     }
   };
   const handleCancelImage = () => {
@@ -365,6 +389,7 @@ export default function ChatScreen() {
           <Text style={styles.title}>
             {routeSessionId ? "Chat" : "New Chat"}
           </Text>
+          {hasDoctors && (
           <Ionicons
             name="medkit"
             size={24}
@@ -373,6 +398,7 @@ export default function ChatScreen() {
             style={styles.doctorIcon}
             onPress={() => setModalVisible2(true)}
           />
+        )}
         </View>
 
         {!isChatOpen && (
@@ -497,14 +523,15 @@ export default function ChatScreen() {
           </View>
         </Modal>
       </View>
-        {/* Footer */}
-              <Text style={styles.footerText}>SknAI can make mistakes.Check important info</Text>
+      {/* Footer */}
+      <Text style={styles.footerText}>
+        SknAI can make mistakes.Check important info
+      </Text>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  
   container: { flex: 1, backgroundColor: "#fff", padding: 20 },
   header: {
     position: "absolute",
@@ -616,12 +643,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 10,
     color: "black",
-    paddingBottom:0
+    paddingBottom: 0,
   },
   input1: {
     height: 40,
-    width: '100%',
-    borderColor: '#ddd',
+    width: "100%",
+    borderColor: "#ddd",
     borderWidth: 1,
     marginBottom: 15,
     paddingLeft: 10,
@@ -630,15 +657,15 @@ const styles = StyleSheet.create({
   },
   uploadButton: {
     marginBottom: 15,
-    backgroundColor: '#4CAF50',
+    backgroundColor: "#4CAF50",
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
   },
   uploadButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
 });
 
@@ -693,4 +720,3 @@ export const markdownStyles: any = {
     color: "#555",
   },
 };
-

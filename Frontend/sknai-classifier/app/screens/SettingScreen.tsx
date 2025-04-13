@@ -140,6 +140,19 @@ const SettingScreen = () => {
           </View>
           <Feather name="edit" size={20} color="black" />
         </TouchableOpacity>
+        {/* Change Password */}
+        <TouchableOpacity style={styles.option} onPress={() => router.push("/screens/ChangePasswordScreen")}>
+          <View style={styles.optionRow}>
+            <Ionicons name="key-outline" size={24} color="black" />
+            <View style={styles.optionTextContainer}>
+              <Text style={styles.optionTitle}>Change Password</Text>
+              <Text style={styles.optionSubtitle}>
+                Update your login credentials
+              </Text>
+            </View>
+          </View>
+          <Feather name="lock" size={20} color="black" />
+        </TouchableOpacity>
 
         {/* Face ID / Touch ID */}
         <View style={styles.option}>

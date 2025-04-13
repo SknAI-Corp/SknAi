@@ -12,7 +12,7 @@ const IndexScreen = () => {
     const checkAuth = async () => {
       const token = await AsyncStorage.getItem("accessToken");
       if (token) {
-        router.replace("/screens/DoctorScreen"); // Redirect to Home if logged in
+        router.replace("/screens/HomeScreen"); // Redirect to Home if logged in
       } else {
         await AsyncStorage.clear();
         setTimeout(() => {

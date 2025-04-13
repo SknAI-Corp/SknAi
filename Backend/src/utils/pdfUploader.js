@@ -1,7 +1,3 @@
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
 import fs from "fs";
 import path from "path";
 import { uploadOnCloudinary, uploadBufferToCloudinary } from "./cloudinary.js";
