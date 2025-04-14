@@ -39,6 +39,8 @@ const IndexScreen = () => {
   
     checkAuth();
   }, []);
+
+  
   // useEffect(() => {
   //   const clearStorage = async () => {
   //     const token = await AsyncStorage.getItem("accessToken");

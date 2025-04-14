@@ -1,221 +1,165 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
-import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  TouchableOpacity,
+  TextInput,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { WebView } from "react-native-webview";
+import { Ionicons } from "@expo/vector-icons";
+import { API_BASE_URL } from "./config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
-import { API_BASE_URL } from "./config";
 
 const DoctorsReview = () => {
+  const { pdf, id } = useLocalSearchParams();
   const router = useRouter();
-   const { id, reportPdfUrl } = useLocalSearchParams();
-   console.log(id);
-   console.log(reportPdfUrl);
-   
-   useEffect(() => {
-    const fetchPdf = async () => {
-      try {
-        const accessToken = await AsyncStorage.getItem("accessToken");
+  const [note, setNote] = useState("");
+  const handleRemarks = async() => {
+    try {
+      const token = await AsyncStorage.getItem("accessToken"); 
+      
+      const response = await axios.patch(
+        `${API_BASE_URL}/api/v1/doctor/reports/${id}/review`, // Replace `reportId` with the actual ID
+        {
+          doctorRemarks: note,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            
+          },
+        }
+      );
+  
+      alert("Remarks submitted successfully!");
+      console.log("Response:", response.data);
+    } catch (error) {
+      console.error("Error submitting remarks:", error);
+      alert("Failed to submit remarks.");
+    }
+  };
 
-        
-      } catch (err) {
-        console.error("Error fetching PDF:", err);
-        
-      } finally {
-        
-      }
-    };
+  // if (!pdf) {
+  //   return (
+  //     <Text style={{ textAlign: "center", marginTop: 100 }}>
+  //       No PDF available.
+  //     </Text>
+  //   );
+  // }
 
-    fetchPdf();
-  }, [id]);
   return (
-    <View>
-      <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
-    </View>
-  )
-}
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.pdfBox}>
+          <WebView
+            originWhitelist={["*"]}
+            source={{ uri: pdf as string }}
+            style={styles.webview}
+          />
+        </View>
+
+        <Text style={styles.label}>Doctor's Notes:</Text>
+        <TextInput
+          style={styles.textArea}
+          placeholder="Write your notes here..."
+          value={note}
+          onChangeText={setNote}
+          multiline
+          numberOfLines={6}
+        />
+        <TouchableOpacity style={styles.remarksButton} onPress={handleRemarks}>
+    <Text style={styles.remarksButtonText}>Submit Remarks</Text>
+  </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+};
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
+  container: { flex: 1, backgroundColor: "#fff" },
+  scrollContainer: {
+    paddingTop: 80,
+    paddingBottom: 40,
+    paddingHorizontal: 16,
+  },
+  header: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     backgroundColor: "#fff",
-    paddingTop:0,
-    paddingBottom:0,
-    marginTop:0,
-    marginBottom:0,
-  },
-  title: {
-    top:10,
-    fontSize: 40,
-    fontWeight: "bold",
-    marginVertical: 40,
-    textAlign: "center",
-    fontFamily: 'Merriweather_700Bold',
-  },
-  label: {
-    fontSize: 16,
-    color: "#666",
-    marginBottom: 15,
-    fontWeight:"bold",
-  },
-  formContainer: {
-    width: 300,
-    height:252,
-    left:30,
-    top:30,
-    marginBottom: 90,
-  },
-  
-  inputContainer: {
-    width: 300,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: "#000",
-    borderRadius: 12,
-    marginBottom: 20,
-    paddingHorizontal: 10,
-    height: 50,
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    
-    height: '100%',
-    fontSize: 16,
-    fontFamily: 'Merriweather_400Regular',
-  },
-  forgotPasswordContainer: {
-    alignSelf: 'flex-end',
-    marginTop: 10,
-  },
-  forgotPassword: {
-    color: "#007bff",
-    fontSize: 16,
-    fontFamily: 'Merriweather_400Regular',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    zIndex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
   },
   backButton: {
     position: "absolute",
-    top: 30,
-    left: 20,
-    padding: 5,
-    zIndex: 1,
+    left: 10,
     backgroundColor: "#E9B08A",
-    borderRadius: 25,
+    padding: 10,
+    borderRadius: 20,
   },
-  button: {
-    
-    backgroundColor: "#E9B08A",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 15,
-    width: 300,
-    height: 54,
-    alignItems: "center",
-    marginTop:0,
-    left:32,
-
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    // padding: 25, 125, 25, 125,
-
-
-  },
-  errorBorder: {
-    borderColor: "red",
-
-  },
-  buttonText: {
-    color: "#000",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  button1: {
-    
-    backgroundColor: "#fff",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 15,
-    width: 300,
-    height: 54,
-    alignItems: "center",
-    marginTop:40,
-    left:32,
+  pdfBox: {
+    height: Dimensions.get("window").height * 0.6,
+    borderRadius: 12,
+    overflow: "hidden",
     borderWidth: 1,
-    borderStyle: 'solid',
-    borderColor:'black',
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-
+    borderColor: "#ddd",
+    marginBottom: 20,
   },
-  buttonText1: {
-    color: "#000",
-    fontSize: 18,
-    fontWeight: "bold",
+  webview: {
+    flex: 1,
   },
-  button2: {
-    
-    backgroundColor: "#fff",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 15,
-    width: 300,
-    height: 54,
-    alignItems: "center",
-    marginTop:30,
-    left:32,
-    borderWidth: 1,
-    borderStyle: 'solid',
-    borderColor:'black',
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-
-  },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 'auto',
-    paddingVertical: 40,
-    marginBottom:50
-  },
-  footerText: {
+  label: {
     fontSize: 16,
-    color: "#666",
-    fontFamily: 'Merriweather_400Regular',
-    
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  textArea: {
+    height: 120,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    textAlignVertical: "top", // makes text start from top-left like textarea
+    backgroundColor: "#f5f5f5",
+    fontSize: 16,
+  },
+  remarksButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: "center",
+    width:"40%",
+    marginTop:5
+
   },
   
-  signUpText: {
+  remarksButtonText: {
+    color: "#fff",
     fontSize: 16,
-    color: "#007bff",
-    fontWeight: "500",
-    fontFamily: 'Merriweather_700Bold',
+    fontWeight: "bold",
   },
 });
-export default DoctorsReview
+
+export default DoctorsReview;

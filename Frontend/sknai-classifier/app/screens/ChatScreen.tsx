@@ -59,11 +59,16 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [hasDoctors, setHasDoctors] = useState(false);
+  const [showThinking, setShowThinking] = useState(false);
+  const [thinkingDots, setThinkingDots] = useState("...");
 
+  
   useEffect(() => {
     const fetchDoctors = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/v1/doctor/all-doctors`);
+        const response = await axios.get(
+          `${API_BASE_URL}/api/v1/doctor/all-doctors`
+        );
         if (response.data?.data?.length > 0) {
           setHasDoctors(true);
         } else {
@@ -74,10 +79,9 @@ export default function ChatScreen() {
         setHasDoctors(false);
       }
     };
-  
+
     fetchDoctors();
   }, []);
-
 
   useEffect(() => {
     if (routeSessionId) {
@@ -145,7 +149,7 @@ export default function ChatScreen() {
     const thinkingMsgObj: Message = {
       id: Date.now().toString(),
       sender: "ai",
-      content: "thinking...",
+      content: "Thinking...",
       imageAttached: null,
       temp: true,
     };
@@ -181,10 +185,22 @@ export default function ChatScreen() {
 
       let aiContent = "";
       setTypingMessage("");
+      setShowThinking(true);
+
+// Animate dots every 500ms
+let dotInterval = setInterval(() => {
+  setThinkingDots((prev) =>
+    prev === "..." ? "." : prev === "." ? ".." : "..."
+  );
+}, 500);
       for (let i = 0; i < aiMessage.content.length; i++) {
         setTimeout(() => {
           aiContent += aiMessage.content[i];
           setTypingMessage(aiContent);
+          if (i === aiMessage.content.length - 1) {
+            clearInterval(dotInterval);
+            setShowThinking(false);
+          }
         }, i * 30);
       }
 
@@ -367,6 +383,7 @@ export default function ChatScreen() {
   };
   const handleCancelImage = () => {
     setSelectedImages([]); // Reset selected image
+    setSelectedImage(null); // Reset selected image
   };
   const handleCancel = () => {
     setModalVisible2(false);
@@ -390,15 +407,15 @@ export default function ChatScreen() {
             {routeSessionId ? "Chat" : "New Chat"}
           </Text>
           {hasDoctors && (
-          <Ionicons
-            name="medkit"
-            size={24}
-            color={hasApiResponse ? "black" : "gray"}
-            disabled={!hasApiResponse}
-            style={styles.doctorIcon}
-            onPress={() => setModalVisible2(true)}
-          />
-        )}
+            <Ionicons
+              name="medkit"
+              size={24}
+              color={hasApiResponse ? "black" : "gray"}
+              disabled={!hasApiResponse}
+              style={styles.doctorIcon}
+              onPress={() => setModalVisible2(true)}
+            />
+          )}
         </View>
 
         {!isChatOpen && (
@@ -415,7 +432,10 @@ export default function ChatScreen() {
               data={chatMessages}
               renderItem={renderMessage}
               keyExtractor={(_, index) => index.toString()}
-              contentContainerStyle={{ paddingBottom: 10, marginTop: 80 }}
+              contentContainerStyle={{
+                paddingBottom: typingMessage.length > 0 ? 90 : 70,
+                marginTop: 80,
+              }}
             />
 
             {typingMessage.length > 0 && (
@@ -423,7 +443,7 @@ export default function ChatScreen() {
                 style={[styles.messageContainer, styles.aiMessageContainer]}
               >
                 <View style={[styles.messageBubble, styles.aiMessage]}>
-                  <Text style={styles.messageText}>{typingMessage}</Text>
+                  <Text style={styles.messageText}>{typingMessage.length > 0 ? typingMessage : `Thinking${thinkingDots}`}</Text>
                 </View>
               </View>
             )}
@@ -515,9 +535,12 @@ export default function ChatScreen() {
                 ))}
 
               {/* Verify Button */}
-              <TouchableOpacity style={styles.verifyButton} onPress={handleVerify}>
-  <Text style={styles.verifyButtonText}>✅ Verify</Text>
-</TouchableOpacity>
+              <TouchableOpacity
+                style={styles.verifyButton}
+                onPress={handleVerify}
+              >
+                <Text style={styles.verifyButtonText}>✅ Verify</Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={handleCancel}>
                 <Text style={styles.modalText}>Cancel</Text>
               </TouchableOpacity>
@@ -682,14 +705,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
-    marginBottom:8
+    marginBottom: 8,
   },
   verifyButtonText: {
     color: "white",
     fontSize: 16,
     fontWeight: "600",
-  }
-  
+  },
 });
 
 export const markdownStyles: any = {

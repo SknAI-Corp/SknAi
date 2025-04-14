@@ -57,7 +57,7 @@ useEffect(() => {
         setSessions(response.data.data); // Assuming `data` contains sessions array
       
     } catch (error) {
-      console.error("Error fetching sessions:", error);
+      // console.error("Error fetching sessions:", error);
     } finally {
       setLoading(false);
     }

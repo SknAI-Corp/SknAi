@@ -2,7 +2,7 @@ import axios from "axios";
 
 export const callClassifierAPI = async (imageUrl) => {
   try {
-    const res = await axios.post("http://172.20.10.3:8080/predict", {
+    const res = await axios.post("http://192.168.5.67:8080/predict", {
       image_url: imageUrl
     });
     return res.data?.prediction || null;

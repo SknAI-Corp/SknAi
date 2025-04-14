@@ -65,65 +65,43 @@ const [guestMessageCount, setGuestMessageCount] = useState(0);
     Keyboard.dismiss();
   
     const hasText = message.trim().length > 0;
-    const hasImage = !!selectedImage;
+    const finalMessage = hasText ? message.trim() : 'What is this?';
   
-    if (!hasText && !hasImage) {
+    if (!hasText && !selectedImage) {
       Alert.alert('Warning', 'Please enter a message or select an image.');
       return;
     }
   
-    const finalMessage = hasText ? message.trim() : 'What is this?';
-  
-    const isGuest = guest === 'true';
-    // const guestToken = isGuest ? `guest-${uuid.v4()}` : await AsyncStorage.getItem("accessToken");
-//   console.log(guestToken);
     const userMsgObj: Message = {
-        sender: 'user', // TypeScript now understands it's one of the allowed types
-        content: finalMessage,
-        imageAttached: selectedImage?.uri || null,
-      };
+      sender: 'user',
+      content: finalMessage,
+      imageAttached: selectedImage?.uri || null,
+    };
     setChatMessages((prev) => [...prev, userMsgObj]);
     setMessage('');
     setSelectedImage(null);
     setLoading(true);
   
-    setChatMessages((prev) => [...prev, {
-      id: Date.now().toString(),
-      sender: 'ai',
-      content: 'thinking...',
-      imageAttached: null,
-      temp: true,
-    }]);
+    setChatMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        sender: 'ai',
+        content: 'thinking...',
+        imageAttached: null,
+        temp: true,
+      },
+    ]);
   
     try {
-      const formData = new FormData();
-  
-      if (typeof sessionId === 'string') {
-        formData.append('sessionId', sessionId);
-      }
-  
-      formData.append('content', finalMessage);
-  
-      if (hasImage && selectedImage?.uri) {
-        const localUri = selectedImage.uri;
-        const filename = selectedImage.name || localUri.split('/').pop();
-        const match = /\.(\w+)$/.exec(filename || '');
-        const type = selectedImage.type || (match ? `image/${match[1]}` : `image`);
-      
-        formData.append('imageAttached', {
-          uri: localUri,
-          name: filename,
-          type,
-        } as any); // 👈 Use `as any` because React Native doesn't have a native Blob/File
-      }
-  console.log(formData);
-      const response = await axios.post(`${API_BASE_URL}/api/v1/messages/`, formData, {
-        headers: {
-          Authorization: `Bearer ${guestToken}`,
-          'Content-Type': 'multipart/form-data',
-        },
+      // 🔥 Make direct FastAPI call (no backend Node.js involved)
+      const response = await axios.post("http://127.0.0.1:8081/chat", {
+        user_message: finalMessage,
+        user_id: "123456", // temporary static user
+        predicted_disease: null,
+        session_id: sessionId,
       });
-  console.log(response.data.data);
+  console.log(response);
       const { sessionId: returnedSessionId, aiMessage } = response.data.data;
   
       if (!sessionId && returnedSessionId) setSessionId(returnedSessionId);
@@ -132,7 +110,6 @@ const [guestMessageCount, setGuestMessageCount] = useState(0);
   
       let aiContent = '';
       setTypingMessage('');
-  
       for (let i = 0; i < aiMessage.content.length; i++) {
         setTimeout(() => {
           aiContent += aiMessage.content[i];
@@ -141,14 +118,16 @@ const [guestMessageCount, setGuestMessageCount] = useState(0);
       }
   
       setTimeout(() => {
-        setChatMessages((prev) => [...prev, {
-          sender: 'ai',
-          content: aiMessage.content,
-          imageAttached: null,
-        }]);
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            sender: 'ai',
+            content: aiMessage.content,
+            imageAttached: null,
+          },
+        ]);
         setTypingMessage('');
       }, aiMessage.content.length * 30 + 200);
-  
     } catch (error) {
       console.error('Error sending message:', error);
       Alert.alert('Error', 'Something went wrong while sending your message.');
@@ -156,6 +135,7 @@ const [guestMessageCount, setGuestMessageCount] = useState(0);
       setLoading(false);
     }
   };
+  
   
   
  

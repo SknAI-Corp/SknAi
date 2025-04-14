@@ -33,49 +33,49 @@ const DoctorScreen: React.FC = () => {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
+
+  const fetchReports = async () => {
+    try {
+      if (!refreshing) setLoading(true); // only show loader for initial load
+      const accessToken = await AsyncStorage.getItem("accessToken");
+
+      const response = await axios.get(`${API_BASE_URL}/api/v1/doctor/reports`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      const data = response.data.data;
+
+      const mappedReports = data.map((report: any) => {
+        const status = report.status || "pending";
+        const isPending = status === "pending";
+
+        return {
+          id: report._id || report.id,
+          case: report.userQuery || "Unknown",
+          date: new Date(report.submittedAt || report.createdAt).toDateString(),
+          icon: isPending ? "assignment-late" : "check-circle",
+          iconColor: isPending ? "#FFD700" : "#34c759",
+          reportPdfUrl: report.reportPdfUrl,
+          status: status,
+        };
+      });
+
+      setReports(mappedReports);
+    } catch (err: any) {
+      setError("Failed to load reports.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // ⬇️ Call fetchReports inside useEffect
   useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        const accessToken = await AsyncStorage.getItem("accessToken");
-
-        console.log(accessToken);
-        const response2 = await axios.get(
-          `${API_BASE_URL}/api/v1/doctor/reports`,
-          {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          }
-        );
-        const data = await response2.data.data;
-
-        // Map to UI format
-        const mappedReports = data.map((report: any) => {
-          const status = report.status || "pending"; // default fallback
-          const isPending = status === "pending";
-
-          return {
-            id: report._id || report.id,
-            case: report.userQuery || "Unknown",
-            date: new Date(
-              report.submittedAt || report.createdAt
-            ).toDateString(),
-            icon: isPending ? "assignment-late" : "check-circle", // or "done", "check"
-            iconColor: isPending ? "#FFD700" : "#34c759", // yellow for pending, green for done
-            reportPdfUrl: report.reportPdfUrl,
-            status: status,
-          };
-        });
-
-        setReports(mappedReports);
-      } catch (err: any) {
-        setError("Failed to load reports.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchReports();
   }, []);
+  
 
   const handleLogout = async () => {
     try {
@@ -111,7 +111,7 @@ const DoctorScreen: React.FC = () => {
     <TouchableOpacity
       onPress={() =>
         router.push(
-          `/screens/DoctorsReport?pdf=${item.reportPdfUrl}&id=${item.id}`
+          `/screens/DoctorsReview?pdf=${item.reportPdfUrl}&id=${item.id}`
         )
       }
     >
@@ -129,12 +129,12 @@ const DoctorScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
         >
           <Ionicons name="arrow-back" size={24} color="black" />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
         <Text style={styles.title}>Doctor’s Screen</Text>
         <TouchableOpacity onPress={handleLogout}>
           <MaterialCommunityIcons name="exit-run" size={28} color="red" />
@@ -157,6 +157,11 @@ const DoctorScreen: React.FC = () => {
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={{ paddingVertical: 20 }}
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            fetchReports();
+          }}
         />
       )}
 

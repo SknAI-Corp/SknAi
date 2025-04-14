@@ -8,28 +8,31 @@ export default function GetStartedScreen() {
 
   return (
     <>
-     <Stack.Screen options={{ headerShown: false }} />
-    <View style={styles.container}>
-      {/* Background Image */}
-      <Image
-        source={require("../../assets/images/started_image.jpeg")}
-        style={styles.backgroundImage}
-      />
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={styles.container}>
+        {/* Background Image */}
+        <Image
+          source={require("../../assets/images/started_image.jpeg")}
+          style={styles.backgroundImage}
+        />
 
-      {/* Overlay Box with Text */}
-      <View style={styles.overlay}>
-        <Text style={styles.title}>Your skin’s health, one scan away.</Text>
-        <Text style={styles.subtitle}>
-          Get instant skin insights with <Text style={styles.bold}>SKnAI</Text> — anytime, anywhere.{"\n"}
-          <Text style={styles.bold}>Smart, simple,</Text> and always ready to help.
-        </Text>
+        {/* Overlay Text Box */}
+        <View style={styles.overlay}>
+          <Text style={styles.headline}>Your Skin. Our Smart Care.</Text>
+          <Text style={styles.subheadline}>Meet Your Pocket Dermatologist.</Text>
+          <Text style={styles.description}>
+            Instant skin insights powered by AI. Doctor-backed, always-on support—right in your pocket.
+          </Text>
+        </View>
 
-       
+        {/* CTA Button */}
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => router.push("/screens/LoginScreen")}
+        >
+          <Text style={styles.buttonText}>Get Started ➜</Text>
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity style={styles.button} onPress={() => router.push("/screens/LoginScreen")}>
-        <Text style={styles.buttonText}>Get Started</Text>
-      </TouchableOpacity>
-    </View>
     </>
   );
 }
@@ -39,63 +42,65 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    width:"100%",
-    height:"100%",
-    margin:0,
+    width: "100%",
+    height: "100%",
   },
   backgroundImage: {
     position: "absolute",
     width: "100%",
     height: "125%",
     resizeMode: "cover",
-    opacity:0.8
+    opacity: 0.85,
   },
   overlay: {
-    backgroundColor: "#FFFFFFDA",
-    padding: 30,
-    borderRadius: 12,
+    backgroundColor: "#FFFFFFCC", // Glassmorphism effect
+    paddingVertical: 25,
+    paddingHorizontal: 20,
+    borderRadius: 14,
     alignItems: "center",
-    width: 357,
-    height:204,
+    width: 340,
+    marginTop: 420,
     marginBottom: 20,
-    marginTop: 400
   },
-  title: {
-    fontSize: 20,
+  headline: {
+    fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 10,
+    marginBottom: 6,
+    color: "#1E1E1E",
   },
-  subtitle: {
-    fontSize: 16,
+  subheadline: {
+    fontSize: 18,
+    fontWeight: "600",
     textAlign: "center",
+    marginBottom: 12,
     color: "#333",
   },
-  bold: {
-    fontWeight: "bold",
+  description: {
+    fontSize: 15,
+    textAlign: "center",
+    color: "#555",
+    lineHeight: 22,
   },
   button: {
-    
     backgroundColor: "#E9B08A",
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 24,
-    borderRadius: 8,
-    width: 351,
-    height: 54,
+    borderRadius: 10,
+    width: 340,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   buttonText: {
     color: "#000",
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "bold",
   },
 });
